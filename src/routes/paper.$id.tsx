@@ -38,7 +38,7 @@ interface Msg {
 }
 
 function PaperDetailPage() {
-  const { paper } = Route.useLoaderData();
+  const { paper } = Route.useLoaderData() as { paper: Paper };
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "assistant",
