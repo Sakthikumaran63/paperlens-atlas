@@ -4,7 +4,7 @@ import { ArrowLeft, Send, Sparkles, Users, Calendar, FileText } from "lucide-rea
 import { AppShell } from "@/components/app/AppShell";
 import { SectionCard } from "@/components/app/SectionCard";
 import { StatusBadge } from "@/components/app/StatusBadge";
-import { getPaper } from "@/lib/mock-papers";
+import { getPaper, type Paper } from "@/lib/mock-papers";
 
 export const Route = createFileRoute("/paper/$id")({
   loader: ({ params }) => {
