@@ -84,13 +84,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "PaperLens is an AI research assistant that helps students and academics understand papers, extract methodology, and ask grounded questions.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:title", content: "PaperLens" },
+      { property: "og:title", content: "PaperLens — Read research papers with clarity" },
       {
         property: "og:description",
         content:
-          "An AI research assistant for reading, understanding, and questioning academic papers.",
+          "PaperLens is an AI research assistant that helps students and academics understand papers, extract methodology, and ask grounded questions.",
       },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "PaperLens — Read research papers with clarity" },
+      { name: "twitter:description", content: "PaperLens is an AI research assistant that helps students and academics understand papers, extract methodology, and ask grounded questions." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/002190d0-db5b-4553-9f9c-81e666b799e4/id-preview-a43b5f6f--c23ca41c-568e-463d-87ae-00e1c3114733.lovable.app-1784818746321.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/002190d0-db5b-4553-9f9c-81e666b799e4/id-preview-a43b5f6f--c23ca41c-568e-463d-87ae-00e1c3114733.lovable.app-1784818746321.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
