@@ -127,7 +127,54 @@ export const mockPapers: Paper[] = [
     ],
     results: ["Zero-shot ImageNet accuracy comparable to fully supervised ResNet-50."],
   },
+  {
+    id: "gpt3",
+    title: "Language Models are Few-Shot Learners",
+    authors: ["Tom B. Brown", "Benjamin Mann", "Nick Ryder", "Melanie Subbiah"],
+    year: 2020,
+    venue: "NeurIPS",
+    addedAt: "2026-07-10",
+    pages: 75,
+    status: "ready",
+    citations: 42100,
+    tags: ["Language Models", "Few-Shot", "NLP"],
+    abstract:
+      "We train GPT-3, an autoregressive language model with 175 billion parameters, and test its performance in the few-shot setting across dozens of NLP datasets.",
+    keyContributions: [
+      "Demonstrates strong few-shot learning at 175B parameters.",
+      "Removes the need for task-specific fine-tuning on many benchmarks.",
+    ],
+    methodology: [
+      "Autoregressive transformer trained on Common Crawl, WebText2, books, and Wikipedia.",
+      "In-context learning via prompts with zero, one, or few examples.",
+    ],
+    results: ["Competitive with fine-tuned models on translation, QA, and cloze tasks."],
+  },
+  {
+    id: "diffusion-beats-gans",
+    title: "Diffusion Models Beat GANs on Image Synthesis",
+    authors: ["Prafulla Dhariwal", "Alex Nichol"],
+    year: 2021,
+    venue: "NeurIPS",
+    addedAt: "2026-07-08",
+    pages: 44,
+    status: "failed",
+    citations: 6100,
+    tags: ["Generative", "Diffusion", "Computer Vision"],
+    abstract:
+      "We show that diffusion models can achieve image sample quality superior to state-of-the-art generative adversarial networks through classifier guidance.",
+    keyContributions: [
+      "Introduces classifier guidance to trade off diversity for fidelity.",
+      "Achieves state-of-the-art FID on ImageNet at multiple resolutions.",
+    ],
+    methodology: [
+      "Improved architecture with attention at multiple resolutions.",
+      "Classifier guidance using gradients from a noise-aware classifier.",
+    ],
+    results: ["FID of 2.97 on ImageNet 128x128, surpassing BigGAN-deep."],
+  },
 ];
+
 
 export const recentActivity = [
   { id: "a1", kind: "upload", title: "Uploaded 'Attention Is All You Need'", when: "2h ago" },
