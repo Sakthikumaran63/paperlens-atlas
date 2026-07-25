@@ -1,9 +1,10 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, Send, Sparkles, Users, Calendar, FileText } from "lucide-react";
+import { ArrowLeft, BookOpen, Send, Sparkles, Users, Calendar, FileText } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { SectionCard } from "@/components/app/SectionCard";
 import { StatusBadge } from "@/components/app/StatusBadge";
+import { PdfReader } from "@/components/app/PdfReader";
 import { getPaper, type Paper } from "@/lib/mock-papers";
 
 export const Route = createFileRoute("/paper/$id")({
@@ -39,6 +40,7 @@ interface Msg {
 
 function PaperDetailPage() {
   const { paper } = Route.useLoaderData() as { paper: Paper };
+  const [readerOpen, setReaderOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "assistant",
@@ -66,12 +68,21 @@ function PaperDetailPage() {
 
   return (
     <AppShell eyebrow={`${paper.venue} · ${paper.year}`} title="Paper reader">
-      <Link
-        to="/papers"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" /> Back to library
-      </Link>
+      {readerOpen && <PdfReader paper={paper} onClose={() => setReaderOpen(false)} />}
+      <div className="flex items-center justify-between gap-3">
+        <Link
+          to="/papers"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to library
+        </Link>
+        <button
+          onClick={() => setReaderOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+        >
+          <BookOpen className="h-3.5 w-3.5" /> Open PDF
+        </button>
+      </div>
 
       <div className="mt-4 grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
