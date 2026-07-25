@@ -1,9 +1,10 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, Send, Sparkles, Users, Calendar, FileText } from "lucide-react";
+import { ArrowLeft, BookOpen, Send, Sparkles, Users, Calendar, FileText } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { SectionCard } from "@/components/app/SectionCard";
 import { StatusBadge } from "@/components/app/StatusBadge";
+import { PdfReader } from "@/components/app/PdfReader";
 import { getPaper, type Paper } from "@/lib/mock-papers";
 
 export const Route = createFileRoute("/paper/$id")({
