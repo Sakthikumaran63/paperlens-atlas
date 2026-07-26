@@ -196,8 +196,8 @@ function DropZone({ dragOver, onDragOver, onDragLeave, onDrop, onChoose }: DropP
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       className={cn(
-        "flex flex-col items-center justify-center rounded-xl border-2 border-dashed bg-surface px-6 py-16 text-center transition",
-        dragOver ? "border-primary bg-accent/50" : "border-border",
+        "flex flex-col items-center justify-center rounded-lg border-2 border-dashed bg-surface px-6 py-16 text-center transition-colors",
+        dragOver ? "border-primary bg-accent/40" : "border-border hover:border-primary/40",
       )}
     >
       <div className="grid h-14 w-14 place-items-center rounded-full border border-border bg-background text-primary">
@@ -241,7 +241,7 @@ function FilePreview({ file, phase, stepIndex, onRemove, onAnalyze }: PreviewPro
   const isDone = phase === "done";
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-6">
+    <div className="rounded-lg border border-border bg-surface p-6">
       <div className="flex items-start gap-4">
         <div className="grid h-12 w-10 shrink-0 place-items-center rounded border border-border bg-background text-muted-foreground">
           <FileText className="h-4 w-4" aria-hidden />

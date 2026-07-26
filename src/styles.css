@@ -131,6 +131,24 @@
   ::selection {
     background: color-mix(in oklab, var(--terracotta) 25%, transparent);
   }
+
+  /* Consistent editorial focus ring for interactive elements */
+  a:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  [role="tab"]:focus-visible,
+  [role="switch"]:focus-visible,
+  summary:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--color-background),
+      0 0 0 4px color-mix(in oklab, var(--terracotta) 45%, transparent);
+    border-radius: var(--radius-md);
+  }
+
+  h1, h2, h3, h4 {
+    letter-spacing: -0.005em;
+  }
 }
 
 @utility font-serif-editorial {
