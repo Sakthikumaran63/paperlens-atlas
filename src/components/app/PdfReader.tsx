@@ -285,7 +285,7 @@ export function PdfReader({ paper, onClose }: Props) {
                         {shouldHighlight ? (
                           <>
                             {p.slice(0, 60)}{" "}
-                            <mark className="rounded-sm bg-[color:var(--accent-terracotta,#B86B4B)]/25 px-0.5 py-[1px] text-neutral-900 ring-1 ring-[color:var(--accent-terracotta,#B86B4B)]/40">
+                            <mark className="rounded-sm bg-[color:var(--terracotta)]/25 px-0.5 py-[1px] text-neutral-900 ring-1 ring-[color:var(--terracotta)]/40">
                               {activeCitation!.passage}
                             </mark>{" "}
                             {p.slice(60)}
@@ -344,7 +344,7 @@ export function PdfReader({ paper, onClose }: Props) {
                         Page {m.citation.page} · {m.citation.section}
                       </span>
                     </div>
-                    <div className="border-l-2 border-[color:var(--accent-terracotta,#B86B4B)] pl-2 font-serif-editorial text-[13px] italic text-foreground/90">
+                    <div className="border-l-2 border-[color:var(--terracotta)] pl-2 font-serif-editorial text-[13px] italic text-foreground/90">
                       "{m.citation.passage}"
                     </div>
                   </button>
