@@ -6,6 +6,7 @@ import {
   Clock,
   Settings,
   LifeBuoy,
+  User,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
@@ -25,6 +26,7 @@ const primary: Item[] = [
 ];
 
 const secondary: Item[] = [
+  { label: "Profile", to: "/settings", icon: User },
   { label: "Settings", to: "/settings", icon: Settings },
   { label: "Help", to: "/help", icon: LifeBuoy },
 ];
@@ -35,15 +37,22 @@ function NavRow({ item, active }: { item: Item; active: boolean }) {
     <Link
       to={item.to}
       className={cn(
-        "group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition",
+        "group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         active
           ? "bg-accent text-primary"
           : "text-foreground/80 hover:bg-muted hover:text-foreground",
       )}
     >
+      {active && (
+        <span
+          aria-hidden
+          className="absolute inset-y-1.5 left-0 w-0.5 rounded-r-sm bg-primary"
+        />
+      )}
       <Icon
         className={cn(
-          "h-4 w-4 shrink-0",
+          "h-4 w-4 shrink-0 transition-colors",
           active ? "text-primary" : "text-muted-foreground group-hover:text-foreground",
         )}
         aria-hidden
@@ -84,15 +93,18 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <NavRow key={item.to} item={item} active={isActive(item.to)} />
           ))}
         </nav>
-        <div className="mt-4 flex items-center gap-3 rounded-md border border-border bg-background px-3 py-2.5">
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+        <Link
+          to="/settings"
+          className="mt-4 flex items-center gap-3 rounded-md border border-border bg-background px-3 py-2.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        >
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-border bg-surface text-[11px] font-semibold tracking-wide text-foreground">
             AR
           </div>
           <div className="min-w-0 leading-tight">
             <div className="truncate text-sm font-medium text-foreground">Aria Ren</div>
             <div className="truncate text-xs text-muted-foreground">Research fellow</div>
           </div>
-        </div>
+        </Link>
       </div>
     </aside>
   );
