@@ -70,6 +70,9 @@ function PapersPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("All");
   const [sort, setSort] = useState<SortId>("recent-analyzed");
+  const [pendingDelete, setPendingDelete] = useState<Paper | null>(null);
+
+
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
