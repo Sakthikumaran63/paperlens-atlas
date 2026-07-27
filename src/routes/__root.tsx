@@ -111,6 +111,12 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
+      <Toaster
+        position="top-right"
+        richColors={false}
+        closeButton
+        mobileOffset={{ bottom: "16px" }}
+      />
     </QueryClientProvider>
   );
 }
