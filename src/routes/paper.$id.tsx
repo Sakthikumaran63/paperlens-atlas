@@ -227,30 +227,78 @@ function PaperDetailPage() {
               <Sparkles className="h-3 w-3 text-primary" /> Mock responses
             </div>
             <div className="flex-1 space-y-3 overflow-y-auto pr-1">
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={
-                    m.role === "assistant"
-                      ? "rounded-md border border-border bg-background p-3 text-sm text-foreground"
-                      : "rounded-md bg-accent p-3 text-sm text-accent-foreground"
-                  }
-                >
-                  {m.text}
+              {messages.map((m, i) => {
+                if (m.role === "user") {
+                  return (
+                    <div key={i} className="rounded-md bg-accent p-3 text-sm text-accent-foreground">
+                      {m.text}
+                    </div>
+                  );
+                }
+                if (m.kind === "no-source") {
+                  return (
+                    <div key={i} className="rounded-md border border-dashed border-border bg-background p-3 text-sm">
+                      <div className="flex items-start gap-2 text-foreground">
+                        <SearchX className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                        <div>
+                          <div>{m.text}</div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Try rephrasing your question or asking about the paper's methodology, results, or contributions.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                if (m.kind === "error") {
+                  return (
+                    <div key={i} className="rounded-md border border-border bg-background p-3 text-sm">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--terracotta)]" aria-hidden />
+                        <div className="flex-1">
+                          <div className="text-foreground">{m.text}</div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Network error — check your connection or retry.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={retryLast}
+                            className="mt-2 rounded-md border border-border bg-background px-3 py-1 text-xs text-foreground hover:bg-muted"
+                          >
+                            Retry
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={i} className="rounded-md border border-border bg-background p-3 text-sm text-foreground">
+                    {m.text}
+                  </div>
+                );
+              })}
+              {status !== "idle" && (
+                <div className="rounded-md border border-border bg-background p-3">
+                  <TypingIndicator
+                    label={status === "searching" ? "Searching the paper…" : "Preparing answer…"}
+                  />
                 </div>
-              ))}
+              )}
             </div>
             <form onSubmit={send} className="mt-4 flex items-center gap-2">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask about methodology, results…"
-                className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                disabled={status !== "idle"}
+                className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
               />
               <button
                 type="submit"
                 aria-label="Send question"
-                className="grid h-9 w-9 place-items-center rounded-md bg-primary text-primary-foreground transition hover:opacity-90"
+                disabled={status !== "idle" || !input.trim()}
+                className="grid h-9 w-9 place-items-center rounded-md bg-primary text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
               >
                 <Send className="h-4 w-4" />
               </button>
