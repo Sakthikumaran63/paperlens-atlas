@@ -15,25 +15,7 @@ import { NotFoundView } from "./404";
 import { ErrorState } from "@/components/app/states/StatePanels";
 
 function NotFoundComponent() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="font-serif-editorial text-7xl text-foreground">404</h1>
-        <h2 className="mt-4 text-lg font-medium text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          This page has been moved to the archives or never existed.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
-          >
-            Back to overview
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
+  return <NotFoundView />;
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
@@ -44,31 +26,21 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="font-serif-editorial text-2xl text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. Try again or return to the overview.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
-          >
-            Try again
-          </button>
-          <a
-            href="/dashboard"
-            className="inline-flex items-center justify-center rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-          >
-            Go to overview
-          </a>
-        </div>
+    <div className="flex min-h-dvh items-center justify-center bg-background px-4 py-16">
+      <div className="w-full max-w-md">
+        <ErrorState
+          title="Something went wrong"
+          description="We couldn't complete your request. Please try again."
+          retryLabel="Try Again"
+          onRetry={() => {
+            router.invalidate();
+            reset();
+          }}
+          secondaryLabel="Back to Dashboard"
+          onSecondary={() => {
+            window.location.href = "/dashboard";
+          }}
+        />
       </div>
     </div>
   );
