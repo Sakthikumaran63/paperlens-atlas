@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, BookOpen, Send, Sparkles, Users, Calendar, FileText } from "lucide-react";
+import { ArrowLeft, BookOpen, Send, Sparkles, Users, Calendar, FileText, AlertTriangle, SearchX } from "lucide-react";
+import { TypingIndicator } from "@/components/app/states/Skeletons";
 import { AppShell } from "@/components/app/AppShell";
 import { SectionCard } from "@/components/app/SectionCard";
 import { StatusBadge } from "@/components/app/StatusBadge";
