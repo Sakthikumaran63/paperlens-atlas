@@ -195,21 +195,21 @@ function PapersPage() {
           <EmptyState
             icon={Library}
             title="Your research library is empty"
-            description="Upload your first paper to begin analyzing it."
+            description="Upload your first research paper to start exploring summaries, methodology, and AI-powered answers."
             action={
               <Link
                 to="/upload"
-                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >
-                <UploadCloud className="h-4 w-4" /> Upload PDF
+                <UploadCloud className="h-4 w-4" /> Upload Your First Paper
               </Link>
             }
           />
         ) : filtered.length === 0 ? (
           <EmptyState
-            icon={FolderOpen}
-            title="No papers match your filters"
-            description="Try a different search term or clear the current filter."
+            icon={SearchIcon}
+            title="No papers found"
+            description="We couldn't find a paper matching your search."
             action={
               <button
                 type="button"
@@ -219,7 +219,7 @@ function PapersPage() {
                 }}
                 className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm text-foreground hover:border-primary/60"
               >
-                Reset filters
+                Clear Search
               </button>
             }
           />
@@ -230,13 +230,24 @@ function PapersPage() {
                 <LibraryPaperCard
                   paper={p}
                   onRename={() => handleRename(p)}
-                  onDelete={() => handleDelete(p)}
+                  onDelete={() => setPendingDelete(p)}
                 />
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Delete this paper?"
+        description="This will permanently remove the paper and its analysis from your workspace."
+        confirmLabel="Delete Paper"
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={confirmDelete}
+      />
     </AppShell>
   );
 }
