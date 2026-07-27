@@ -24,6 +24,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/app/states/ConfirmDialog";
+import { Search as SearchIcon } from "lucide-react";
 
 export const Route = createFileRoute("/papers")({
   head: () => ({
@@ -68,6 +70,9 @@ function PapersPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("All");
   const [sort, setSort] = useState<SortId>("recent-analyzed");
+  const [pendingDelete, setPendingDelete] = useState<Paper | null>(null);
+
+
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -99,14 +104,17 @@ function PapersPage() {
     setPapers((prev) =>
       prev.map((p) => (p.id === paper.id ? { ...p, title: next.trim() } : p)),
     );
-    toast.success("Paper renamed");
+    toast.success("Paper renamed successfully");
   }
 
-  function handleDelete(paper: Paper) {
-    if (!window.confirm(`Delete "${paper.title}" from your library?`)) return;
-    setPapers((prev) => prev.filter((p) => p.id !== paper.id));
-    toast.success("Paper removed from library");
+  function confirmDelete() {
+    if (!pendingDelete) return;
+    const id = pendingDelete.id;
+    setPapers((prev) => prev.filter((p) => p.id !== id));
+    setPendingDelete(null);
+    toast.success("Paper deleted successfully");
   }
+
 
   return (
     <AppShell eyebrow="Library" title="My Papers">
@@ -187,21 +195,21 @@ function PapersPage() {
           <EmptyState
             icon={Library}
             title="Your research library is empty"
-            description="Upload your first paper to begin analyzing it."
+            description="Upload your first research paper to start exploring summaries, methodology, and AI-powered answers."
             action={
               <Link
                 to="/upload"
-                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >
-                <UploadCloud className="h-4 w-4" /> Upload PDF
+                <UploadCloud className="h-4 w-4" /> Upload Your First Paper
               </Link>
             }
           />
         ) : filtered.length === 0 ? (
           <EmptyState
-            icon={FolderOpen}
-            title="No papers match your filters"
-            description="Try a different search term or clear the current filter."
+            icon={SearchIcon}
+            title="No papers found"
+            description="We couldn't find a paper matching your search."
             action={
               <button
                 type="button"
@@ -211,7 +219,7 @@ function PapersPage() {
                 }}
                 className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm text-foreground hover:border-primary/60"
               >
-                Reset filters
+                Clear Search
               </button>
             }
           />
@@ -222,13 +230,24 @@ function PapersPage() {
                 <LibraryPaperCard
                   paper={p}
                   onRename={() => handleRename(p)}
-                  onDelete={() => handleDelete(p)}
+                  onDelete={() => setPendingDelete(p)}
                 />
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Delete this paper?"
+        description="This will permanently remove the paper and its analysis from your workspace."
+        confirmLabel="Delete Paper"
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={confirmDelete}
+      />
     </AppShell>
   );
 }
