@@ -104,14 +104,17 @@ function PapersPage() {
     setPapers((prev) =>
       prev.map((p) => (p.id === paper.id ? { ...p, title: next.trim() } : p)),
     );
-    toast.success("Paper renamed");
+    toast.success("Paper renamed successfully");
   }
 
-  function handleDelete(paper: Paper) {
-    if (!window.confirm(`Delete "${paper.title}" from your library?`)) return;
-    setPapers((prev) => prev.filter((p) => p.id !== paper.id));
-    toast.success("Paper removed from library");
+  function confirmDelete() {
+    if (!pendingDelete) return;
+    const id = pendingDelete.id;
+    setPapers((prev) => prev.filter((p) => p.id !== id));
+    setPendingDelete(null);
+    toast.success("Paper deleted successfully");
   }
+
 
   return (
     <AppShell eyebrow="Library" title="My Papers">
