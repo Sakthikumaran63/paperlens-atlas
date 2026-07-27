@@ -34,9 +34,11 @@ export const Route = createFileRoute("/paper/$id")({
   component: PaperDetailPage,
 });
 
+type MsgKind = "answer" | "no-source" | "error";
 interface Msg {
   role: "user" | "assistant";
   text: string;
+  kind?: MsgKind;
 }
 
 function PaperDetailPage() {
@@ -49,22 +51,72 @@ function PaperDetailPage() {
     },
   ]);
   const [input, setInput] = useState("");
+  const [status, setStatus] = useState<"idle" | "searching" | "preparing">("idle");
+
+  const askAssistant = (value: string) => {
+    setMessages((m) => [...m, { role: "user", text: value }]);
+    setStatus("searching");
+    // Two-stage indicator, then a mock reply.
+    setTimeout(() => setStatus("preparing"), 500);
+    setTimeout(() => {
+      const lower = value.toLowerCase();
+      // Simulate outcomes based on the question.
+      const looksIrrelevant = /weather|price|stock|movie|recipe/.test(lower);
+      const shouldFail = /error|fail|crash/.test(lower);
+
+      setStatus("idle");
+      if (shouldFail) {
+        setMessages((m) => [
+          ...m,
+          {
+            role: "assistant",
+            kind: "error",
+            text: "I couldn't answer that. Please try again in a moment.",
+          },
+        ]);
+        return;
+      }
+      if (looksIrrelevant) {
+        setMessages((m) => [
+          ...m,
+          {
+            role: "assistant",
+            kind: "no-source",
+            text: "I couldn't find relevant information in this paper.",
+          },
+        ]);
+        return;
+      }
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          kind: "answer",
+          text: `Based on the paper, ${paper.keyContributions[0].toLowerCase()} This is a mocked answer while the reasoning backend is being connected.`,
+        },
+      ]);
+    }, 1250);
+  };
 
   const send = (e: React.FormEvent) => {
     e.preventDefault();
     const value = input.trim();
     if (!value) return;
-    setMessages((m) => [...m, { role: "user", text: value }]);
     setInput("");
-    setTimeout(() => {
-      setMessages((m) => [
-        ...m,
-        {
-          role: "assistant",
-          text: `Based on the paper, ${paper.keyContributions[0].toLowerCase()} This is a mocked answer while the reasoning backend is being connected.`,
-        },
-      ]);
-    }, 550);
+    askAssistant(value);
+  };
+
+  const retryLast = () => {
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    if (!lastUser) return;
+    // Drop last assistant turn, then re-ask.
+    setMessages((m) => {
+      const idx = [...m].reverse().findIndex((x) => x.role === "assistant");
+      if (idx < 0) return m;
+      const cut = m.length - 1 - idx;
+      return m.slice(0, cut);
+    });
+    askAssistant(lastUser.text);
   };
 
   return (
