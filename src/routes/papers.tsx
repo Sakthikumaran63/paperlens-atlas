@@ -24,6 +24,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/app/states/ConfirmDialog";
+import { Search as SearchIcon } from "lucide-react";
 
 export const Route = createFileRoute("/papers")({
   head: () => ({
