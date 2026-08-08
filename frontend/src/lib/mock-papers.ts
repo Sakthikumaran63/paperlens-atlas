@@ -48,8 +48,7 @@ export const mockPapers: Paper[] = [
   },
   {
     id: "bert",
-    title:
-      "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+    title: "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
     authors: ["Jacob Devlin", "Ming-Wei Chang", "Kenton Lee", "Kristina Toutanova"],
     year: 2019,
     venue: "NAACL",
@@ -174,7 +173,6 @@ export const mockPapers: Paper[] = [
     results: ["FID of 2.97 on ImageNet 128x128, surpassing BigGAN-deep."],
   },
 ];
-
 
 export const recentActivity = [
   { id: "a1", kind: "upload", title: "Uploaded 'Attention Is All You Need'", when: "2h ago" },
