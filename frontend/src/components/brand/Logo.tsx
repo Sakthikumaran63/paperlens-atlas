@@ -2,7 +2,7 @@ export function Logo({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <div className="flex items-center gap-2">
       <img
-        src="/photo_2026-08-09_17-55-17.svg"
+        src="/paperlens-logo.svg"
         alt="PaperLens Logo"
         width="28"
         height="28"
