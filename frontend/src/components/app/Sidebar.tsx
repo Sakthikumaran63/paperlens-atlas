@@ -32,7 +32,7 @@ const primary: Item[] = [
 ];
 
 const secondary: Item[] = [
-  { label: "Profile", to: "/settings", icon: User },
+  { label: "Profile", to: "/profile", icon: User },
   { label: "Settings", to: "/settings", icon: Settings },
   { label: "Help", to: "/help", icon: LifeBuoy },
 ];
@@ -71,6 +71,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const [authOpen, setAuthOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(() => {
+    if (typeof window === "undefined") {
+      return { email: "kkssakthikumaran@gmail.com", name: "Sakthi Kumaran", is_admin: true };
+    }
     const cached = localStorage.getItem("paperlens_user");
     return cached ? JSON.parse(cached) : { email: "kkssakthikumaran@gmail.com", name: "Sakthi Kumaran", is_admin: true };
   });

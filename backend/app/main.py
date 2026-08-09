@@ -25,7 +25,8 @@ if _IS_SQLITE:
 
     class _UUIDCompat(String):
         """Drop-in for postgresql.UUID that works on SQLite (stored as TEXT)."""
-        def __init__(self, as_uuid=True, **kw):
+        def __init__(self, as_uuid=True, length=36, **kw):
+            kw.pop("length", None)
             super().__init__(length=36, **kw)
 
     _pg.UUID = _UUIDCompat  # type: ignore[attr-defined]
