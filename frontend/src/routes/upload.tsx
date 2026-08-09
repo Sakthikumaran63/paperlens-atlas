@@ -55,7 +55,18 @@ const STAGE_INDEXES: Record<string, number> = {
   FAILED: -1,
 };
 
+const STAGE_STEPS = [
+  "Uploading document",
+  "Extracting text and pages",
+  "Detecting scientific sections",
+  "Performing structure-aware chunking",
+  "Generating vector embeddings",
+  "Generating 10-field structured analysis",
+  "Ready for analysis",
+];
+
 type Phase = "idle" | "selected" | "uploading" | "processing" | "done" | "processing-failed";
+
 
 interface SelectedFile {
   raw: File;
@@ -238,26 +249,35 @@ function UploadPage() {
           )}
 
           {/* Processing State */}
+
           {(phase === "uploading" || phase === "processing") && (
-            <ProcessingState
-              currentStep={stepIndex}
-              title={currentStageLabel}
-              description={`Processing "${file?.name ?? "PDF"}". Progress: ${progressPercent}%.`}
-              footer={
-                <div className="w-full max-w-md mx-auto space-y-2 mt-4">
-                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-500 ease-out"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                  <div className="text-xs text-center text-muted-foreground">
-                    {progressPercent}% Complete
-                  </div>
+            <div className="rounded-lg border border-border bg-surface p-6 space-y-4">
+              <div className="text-center">
+                <h2 className="font-serif-editorial text-xl text-foreground md:text-2xl">{currentStageLabel}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Processing &quot;{file?.name ?? "PDF"}&quot;. Progress: {progressPercent}%.
+                </p>
+              </div>
+              <div className="max-w-md mx-auto py-2">
+                <ProcessingState
+                  steps={STAGE_STEPS}
+                  currentIndex={stepIndex}
+                />
+              </div>
+              <div className="w-full max-w-md mx-auto space-y-2 pt-2">
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-500 ease-out"
+                    style={{ width: `${progressPercent}%` }}
+                  />
                 </div>
-              }
-            />
+                <div className="text-xs text-center text-muted-foreground font-medium">
+                  {progressPercent}% Complete
+                </div>
+              </div>
+            </div>
           )}
+
 
           {/* File Selected State */}
           {phase === "selected" && file && (
