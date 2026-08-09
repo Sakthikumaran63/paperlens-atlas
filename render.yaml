@@ -7,14 +7,15 @@ databases:
 services:
   - type: web
     name: paperlens-backend
+    runtime: python
     plan: free
-    env: python
     rootDir: backend
     buildCommand: "pip install -r requirements.txt"
     startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /health
-    pythonVersion: "3.11.0"
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
       - key: DATABASE_URL
         fromDatabase:
           name: paperlens-db
@@ -61,8 +62,6 @@ services:
         value: "0.70"
       - key: CORS_ORIGINS
         value: '["https://paperlens-atlas-1qlqfbkg6-sakthi9.vercel.app","http://localhost:5173"]'
-      # Set these as secrets in the Render dashboard after deployment:
-      # SECRET_KEY, EMBEDDING_API_KEY, LLM_API_KEY
       - key: SECRET_KEY
         generateValue: true
       - key: EMBEDDING_API_KEY
