@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import re
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from app.models.enums import QuestionType, SectionType
 from app.schemas.question import QuestionClassificationResponse
 
