@@ -61,7 +61,8 @@ services:
       - key: MIN_SUPPORT_SCORE_THRESHOLD
         value: "0.70"
       - key: CORS_ORIGINS
-        value: '["https://paperlens-atlas-1qlqfbkg6-sakthi9.vercel.app","http://localhost:5173"]'
+        value: '["*"]'
+
       - key: SECRET_KEY
         generateValue: true
       - key: EMBEDDING_API_KEY
