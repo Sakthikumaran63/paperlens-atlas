@@ -1,0 +1,69 @@
+databases:
+  - name: paperlens-db
+    databaseName: paperlens
+    user: paperlens
+    plan: free
+
+services:
+  - type: web
+    name: paperlens-backend
+    plan: free
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: paperlens-db
+          property: connectionString
+      - key: PROJECT_NAME
+        value: paperlens-backend
+      - key: ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+      - key: MAX_UPLOAD_SIZE_BYTES
+        value: "20971520"
+      - key: UPLOAD_DIR
+        value: storage/uploads
+      - key: EMBEDDING_API_BASE
+        value: https://api.openai.com/v1
+      - key: EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: EMBEDDING_DIMENSION
+        value: "1536"
+      - key: EMBEDDING_BATCH_SIZE
+        value: "64"
+      - key: RETRIEVAL_SEMANTIC_WEIGHT
+        value: "0.60"
+      - key: RETRIEVAL_SECTION_WEIGHT
+        value: "0.25"
+      - key: RETRIEVAL_KEYWORD_WEIGHT
+        value: "0.15"
+      - key: MAX_EVIDENCE_CONTEXT_TOKENS
+        value: "1500"
+      - key: DEDUPLICATION_SIMILARITY_THRESHOLD
+        value: "0.85"
+      - key: LLM_API_BASE
+        value: https://api.openai.com/v1
+      - key: LLM_MODEL
+        value: gpt-4o-mini
+      - key: LLM_TEMPERATURE
+        value: "0.0"
+      - key: MIN_SUPPORT_SCORE_THRESHOLD
+        value: "0.70"
+      - key: CORS_ORIGINS
+        value: '["https://paperlens-atlas-1qlqfbkg6-sakthi9.vercel.app","http://localhost:5173"]'
+      # Set these as secrets in the Render dashboard after deployment:
+      # SECRET_KEY, EMBEDDING_API_KEY, LLM_API_KEY
+      - key: SECRET_KEY
+        generateValue: true
+      - key: EMBEDDING_API_KEY
+        sync: false
+      - key: LLM_API_KEY
+        sync: false

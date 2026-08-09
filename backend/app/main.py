@@ -50,4 +50,10 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     )
 
 
+
+@app.get("/health", tags=["health"])
+async def health_check():
+    return {"status": "ok", "service": settings.PROJECT_NAME}
+
+
 app.include_router(api_router, prefix="/api/v1")
