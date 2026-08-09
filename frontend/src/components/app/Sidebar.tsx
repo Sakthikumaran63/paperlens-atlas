@@ -65,9 +65,8 @@ function NavRow({ item, active }: { item: Item; active: boolean }) {
   );
 }
 
-}
-
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [authOpen, setAuthOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
