@@ -1,0 +1,50 @@
+app = "paperlens-backend"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PROJECT_NAME = "paperlens-backend"
+  ENV = "production"
+  LOG_LEVEL = "INFO"
+  ALGORITHM = "HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES = "1440"
+  MAX_UPLOAD_SIZE_BYTES = "20971520"
+  UPLOAD_DIR = "storage/uploads"
+  EMBEDDING_API_BASE = "https://api.openai.com/v1"
+  EMBEDDING_MODEL = "text-embedding-3-small"
+  EMBEDDING_DIMENSION = "1536"
+  EMBEDDING_BATCH_SIZE = "64"
+  RETRIEVAL_SEMANTIC_WEIGHT = "0.60"
+  RETRIEVAL_SECTION_WEIGHT = "0.25"
+  RETRIEVAL_KEYWORD_WEIGHT = "0.15"
+  MAX_EVIDENCE_CONTEXT_TOKENS = "1500"
+  DEDUPLICATION_SIMILARITY_THRESHOLD = "0.85"
+  LLM_API_BASE = "https://api.openai.com/v1"
+  LLM_MODEL = "gpt-4o-mini"
+  LLM_TEMPERATURE = "0.0"
+  MIN_SUPPORT_SCORE_THRESHOLD = "0.70"
+  CORS_ORIGINS = '["https://paperlens-atlas-1qlqfbkg6-sakthi9.vercel.app","http://localhost:5173"]'
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[mounts]
+  source = "paperlens_uploads"
+  destination = "/app/storage/uploads"
+  initial_size = "1gb"

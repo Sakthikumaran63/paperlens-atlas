@@ -19,7 +19,17 @@ class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
     name: Optional[str] = None
+    is_admin: bool = False
+    provider: str = "email"
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class OAuthLoginRequest(BaseModel):
+    provider: str  # "google" or "microsoft"
+    email: EmailStr
+    name: Optional[str] = None
+    provider_id: Optional[str] = None
+

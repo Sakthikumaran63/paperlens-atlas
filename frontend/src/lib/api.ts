@@ -356,3 +356,54 @@ export async function askPaperQuestion(
     throw err;
   }
 }
+
+export async function oauthLogin(provider: "google" | "microsoft", email: string, name?: string, providerId?: string): Promise<any> {
+  const resp = await fetch(`${API_BASE_URL}/auth/oauth`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider, email, name, provider_id: providerId }),
+  });
+  const data = await handleResponse<any>(resp);
+  if (data.access_token) {
+    localStorage.setItem(TOKEN_KEY, data.access_token);
+  }
+  return data;
+}
+
+export async function registerUser(email: string, password: string, name?: string): Promise<any> {
+
+  const resp = await fetch(`${API_BASE_URL}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, name }),
+  });
+  const data = await handleResponse<any>(resp);
+  if (data.access_token) {
+    localStorage.setItem(TOKEN_KEY, data.access_token);
+  }
+  return data;
+}
+
+export async function getAdminStats(): Promise<any> {
+  const headers = await getAuthHeaders();
+  const resp = await fetch(`${API_BASE_URL}/admin/stats`, { headers });
+  return await handleResponse<any>(resp);
+}
+
+export async function getAdminUsers(): Promise<any[]> {
+  const headers = await getAuthHeaders();
+  const resp = await fetch(`${API_BASE_URL}/admin/users`, { headers });
+  return await handleResponse<any[]>(resp);
+}
+
+export async function deleteAdminUser(userId: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const resp = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+    method: "DELETE",
+    headers,
+  });
+  if (!resp.ok) {
+    throw await handleResponse<any>(resp);
+  }
+}
+
