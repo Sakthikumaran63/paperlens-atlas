@@ -39,8 +39,9 @@ async def get_current_user(
     demo_user = result.scalar_one_or_none()
 
     if not demo_user:
+        demo_id = str(uuid.UUID("00000000-0000-0000-0000-000000000001"))
         demo_user = User(
-            id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+            id=demo_id,
             email="demo@paperlens.ai",
             hashed_password="demo_password_hash_unauthenticated",
             name="Research Scholar"
@@ -48,8 +49,9 @@ async def get_current_user(
         db.add(demo_user)
         await db.flush()
 
+        ws_id = str(uuid.UUID("00000000-0000-0000-0000-000000000002"))
         default_workspace = Workspace(
-            id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
+            id=ws_id,
             user_id=demo_user.id,
             name="Default Workspace",
             description="Your default PaperLens research workspace."
@@ -59,6 +61,7 @@ async def get_current_user(
         await db.refresh(demo_user)
 
     return demo_user
+
 
 
 
