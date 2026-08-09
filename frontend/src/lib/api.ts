@@ -3,7 +3,7 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
-  "https://paperlens-backend-gotx.onrender.com/api/v1";
+  "http://localhost:8000/api/v1";
 
 
 const TOKEN_KEY = "paperlens_access_token";
