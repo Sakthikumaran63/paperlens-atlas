@@ -4,6 +4,9 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from alembic.config import Config
+from alembic import command
+
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.logging import setup_logging
@@ -12,11 +15,23 @@ setup_logging()
 logger = logging.getLogger("paperlens")
 
 
+def run_db_migrations():
+    try:
+        logger.info("Applying database migrations...")
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Database migrations applied successfully.")
+    except Exception as e:
+        logger.error(f"Error applying database migrations: {e}", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.PROJECT_NAME} in [{settings.ENV}] environment...")
+    run_db_migrations()
     yield
     logger.info(f"Shutting down {settings.PROJECT_NAME}...")
+
 
 
 app = FastAPI(
