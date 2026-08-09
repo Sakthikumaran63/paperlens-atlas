@@ -1,4 +1,5 @@
 from typing import List
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,6 +8,16 @@ class Settings(BaseSettings):
     ENV: str = "development"
     LOG_LEVEL: str = "INFO"
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@db:5432/paperlens"
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_db_connection(cls, v: str) -> str:
+        if isinstance(v, str):
+            if v.startswith("postgres://"):
+                return v.replace("postgres://", "postgresql+asyncpg://", 1)
+            if v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
+                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
     CORS_ORIGINS: List[str] = ["*"]
     SECRET_KEY: str = "paperlens_secret_key_change_in_production_secure_789456123"
     ALGORITHM: str = "HS256"
