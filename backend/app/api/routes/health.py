@@ -34,7 +34,8 @@ async def health_check(
     components["application"] = {
         "status": "healthy",
         "app_name": settings.PROJECT_NAME,
-        "environment": settings.ENVIRONMENT
+        "environment": settings.ENV
+
     }
 
     # 2. Database ping
@@ -53,25 +54,26 @@ async def health_check(
             "error": "Database connectivity failed"
         }
 
-    # 3. Vector storage (pgvector extension check)
+    # 3. Vector storage (pgvector extension check — PostgreSQL only)
     try:
-        vec_res = await db.execute(text("SELECT extname FROM pg_extension WHERE extname = 'vector'"))
-        vec_ext = vec_res.scalar_one_or_none()
-        if vec_ext:
+        if settings.DATABASE_URL.startswith("sqlite"):
             components["vector_storage"] = {
-                "status": "healthy",
-                "extension": "pgvector"
+                "status": "offline_mode",
+                "extension": "SQLite (no pgvector in local dev)"
             }
         else:
+            vec_res = await db.execute(text("SELECT extname FROM pg_extension WHERE extname = 'vector'"))
+            vec_ext = vec_res.scalar_one_or_none()
             components["vector_storage"] = {
-                "status": "degraded",
-                "extension": "pgvector extension not registered"
+                "status": "healthy" if vec_ext else "degraded",
+                "extension": "pgvector" if vec_ext else "pgvector extension not registered"
             }
     except Exception:
         components["vector_storage"] = {
             "status": "degraded",
             "extension": "pgvector check unavailable"
         }
+
 
     # 4. Embedding service configuration check
     components["embedding_service"] = {

@@ -32,7 +32,6 @@ const primary: Item[] = [
 ];
 
 const secondary: Item[] = [
-  { label: "Profile", to: "/profile", icon: User },
   { label: "Settings", to: "/settings", icon: Settings },
   { label: "Help", to: "/help", icon: LifeBuoy },
 ];
