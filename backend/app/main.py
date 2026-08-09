@@ -4,8 +4,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from alembic.config import Config
-from alembic import command
+import subprocess
 
 from app.api.router import api_router
 from app.core.config import settings
@@ -17,12 +16,18 @@ logger = logging.getLogger("paperlens")
 
 def run_db_migrations():
     try:
-        logger.info("Applying database migrations...")
-        alembic_cfg = Config("alembic.ini")
-        command.upgrade(alembic_cfg, "head")
-        logger.info("Database migrations applied successfully.")
+        logger.info("Applying database migrations via Alembic CLI...")
+        res = subprocess.run(
+            ["alembic", "upgrade", "head"],
+            capture_output=True,
+            text=True
+        )
+        if res.returncode == 0:
+            logger.info(f"Database migrations applied successfully:\n{res.stdout}")
+        else:
+            logger.error(f"Database migration failed (code {res.returncode}):\n{res.stderr}")
     except Exception as e:
-        logger.error(f"Error applying database migrations: {e}", exc_info=True)
+        logger.error(f"Error executing database migrations: {e}", exc_info=True)
 
 
 @asynccontextmanager
@@ -31,7 +36,6 @@ async def lifespan(app: FastAPI):
     run_db_migrations()
     yield
     logger.info(f"Shutting down {settings.PROJECT_NAME}...")
-
 
 
 app = FastAPI(
@@ -65,6 +69,16 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     )
 
 
+@app.get("/", tags=["root"])
+async def root():
+    return {
+        "name": "PaperLens FastAPI Backend Service",
+        "status": "online",
+        "health": "/health",
+        "documentation": "/docs",
+        "api_prefix": "/api/v1"
+    }
+
 
 @app.get("/health", tags=["health"])
 async def health_check():
@@ -72,3 +86,4 @@ async def health_check():
 
 
 app.include_router(api_router, prefix="/api/v1")
+
