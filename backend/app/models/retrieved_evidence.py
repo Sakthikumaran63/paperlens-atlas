@@ -2,7 +2,7 @@ from datetime import datetime
 import uuid
 from typing import TYPE_CHECKING, List
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, func
-from sqlalchemy.dialects.postgresql import UUID
+from app.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -17,13 +17,13 @@ class RetrievedEvidence(Base):
     __tablename__ = "retrieved_evidences"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        GUID, primary_key=True, default=uuid.uuid4
     )
     question_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, index=True
+        GUID, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, index=True
     )
     chunk_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("paper_chunks.id", ondelete="CASCADE"), nullable=False, index=True
+        GUID, ForeignKey("paper_chunks.id", ondelete="CASCADE"), nullable=False, index=True
     )
     similarity_score: Mapped[float] = mapped_column(Float, nullable=False)
     rank: Mapped[int] = mapped_column(Integer, nullable=False)

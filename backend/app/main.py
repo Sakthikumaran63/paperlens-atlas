@@ -1,3 +1,4 @@
+import app.db.sqlite_shim  # noqa: F401
 from contextlib import asynccontextmanager
 import logging
 import sys
@@ -13,11 +14,8 @@ from app.core.logging import setup_logging
 setup_logging()
 logger = logging.getLogger("paperlens")
 
-# ── SQLite compatibility shim ────────────────────────────────────────────────
-# When DATABASE_URL is sqlite+aiosqlite, swap out PostgreSQL-specific types
-# (postgresql.UUID and pgvector.Vector) with generic SQLAlchemy equivalents
-# BEFORE any model modules are imported.
 _IS_SQLITE = settings.DATABASE_URL.startswith("sqlite")
+
 
 if _IS_SQLITE:
     import sqlalchemy.dialects.postgresql as _pg

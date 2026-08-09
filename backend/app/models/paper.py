@@ -2,10 +2,9 @@ from datetime import datetime
 import uuid
 from typing import TYPE_CHECKING, List, Optional
 from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
 from app.db.base import Base
+from app.db.types import GUID
 from app.models.enums import PaperStatus, PipelineStage
 
 if TYPE_CHECKING:
@@ -17,13 +16,14 @@ if TYPE_CHECKING:
 
 
 class Paper(Base):
+
     __tablename__ = "papers"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        GUID, primary_key=True, default=uuid.uuid4
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+        GUID, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     authors: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

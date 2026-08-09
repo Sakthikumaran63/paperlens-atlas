@@ -16,10 +16,45 @@ from typing import Optional
 reusable_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
+async def get_current_user_strict(
+    db: AsyncSession = Depends(get_db),
+    token: Optional[str] = Depends(reusable_oauth2)
+) -> User:
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    payload = decode_access_token(token)
+    if not payload or not payload.get("sub"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        user_id = uuid.UUID(payload.get("sub"))
+        stmt = select(User).where(User.id == user_id)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        if user:
+            return user
+    except ValueError:
+        pass
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="User not found",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 async def get_current_user(
     db: AsyncSession = Depends(get_db),
     token: Optional[str] = Depends(reusable_oauth2)
 ) -> User:
+
     if token:
         payload = decode_access_token(token)
         if payload and payload.get("sub"):
@@ -39,9 +74,8 @@ async def get_current_user(
     demo_user = result.scalar_one_or_none()
 
     if not demo_user:
-        demo_id = str(uuid.UUID("00000000-0000-0000-0000-000000000001"))
         demo_user = User(
-            id=demo_id,
+            id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
             email="demo@paperlens.ai",
             hashed_password="demo_password_hash_unauthenticated",
             name="Research Scholar"
@@ -49,9 +83,8 @@ async def get_current_user(
         db.add(demo_user)
         await db.flush()
 
-        ws_id = str(uuid.UUID("00000000-0000-0000-0000-000000000002"))
         default_workspace = Workspace(
-            id=ws_id,
+            id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
             user_id=demo_user.id,
             name="Default Workspace",
             description="Your default PaperLens research workspace."
@@ -61,7 +94,6 @@ async def get_current_user(
         await db.refresh(demo_user)
 
     return demo_user
-
 
 
 

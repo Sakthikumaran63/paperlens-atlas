@@ -38,7 +38,13 @@ class EmbeddingService:
             "input": texts
         }
 
+        if not self.api_key:
+            from app.services.offline_ai import generate_fallback_embedding
+            logger.info("EMBEDDING_API_KEY not configured. Generating local fallback embeddings.")
+            return [generate_fallback_embedding(t) for t in texts]
+
         should_close_client = False
+
         client = self.client
 
         if client is None:

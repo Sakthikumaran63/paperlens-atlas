@@ -2,7 +2,7 @@ from datetime import datetime
 import uuid
 from typing import TYPE_CHECKING, List, Optional
 from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, func
-from sqlalchemy.dialects.postgresql import UUID
+from app.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -17,10 +17,10 @@ class PaperSection(Base):
     __tablename__ = "paper_sections"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        GUID, primary_key=True, default=uuid.uuid4
     )
     paper_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("papers.id", ondelete="CASCADE"), nullable=False, index=True
+        GUID, ForeignKey("papers.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     normalized_title: Mapped[str] = mapped_column(String(512), nullable=False)

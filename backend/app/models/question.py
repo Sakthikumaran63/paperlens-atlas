@@ -2,7 +2,7 @@ from datetime import datetime
 import uuid
 from typing import TYPE_CHECKING, List, Optional
 from sqlalchemy import DateTime, Enum, Float, ForeignKey, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from app.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -19,13 +19,13 @@ class Question(Base):
     __tablename__ = "questions"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        GUID, primary_key=True, default=uuid.uuid4
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+        GUID, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
     )
     paper_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("papers.id", ondelete="SET NULL"), nullable=True, index=True
+        GUID, ForeignKey("papers.id", ondelete="SET NULL"), nullable=True, index=True
     )
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
     question_type: Mapped[QuestionType] = mapped_column(
