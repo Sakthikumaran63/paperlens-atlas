@@ -8,10 +8,12 @@ services:
   - type: web
     name: paperlens-backend
     plan: free
-    runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    env: python
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /health
+    pythonVersion: "3.11.0"
     envVars:
       - key: DATABASE_URL
         fromDatabase:
