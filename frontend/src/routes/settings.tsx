@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { SectionCard } from "@/components/app/SectionCard";
 import { Sun, Moon, Download, Trash2, Camera } from "lucide-react";
@@ -92,6 +92,30 @@ function SettingsPage() {
   const [showSources, setShowSources] = useState(true);
   const [chatHistory, setChatHistory] = useState(true);
 
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("paperlens_user");
+      if (cached) {
+        try {
+          setCurrentUser(JSON.parse(cached));
+        } catch {
+          setCurrentUser(null);
+        }
+      }
+    }
+  }, []);
+
+  const userName = currentUser?.name || "Sakthi Kumaran";
+  const userEmail = currentUser?.email || "kkssakthikumaran@gmail.com";
+  const initials = userName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
   return (
     <AppShell eyebrow="Account" title="Settings">
       <div className="mx-auto max-w-3xl space-y-6">
@@ -100,7 +124,7 @@ function SettingsPage() {
           <div className="flex items-center gap-4">
             <div className="relative">
               <div className="grid h-16 w-16 place-items-center rounded-full bg-primary text-lg font-semibold text-primary-foreground">
-                AR
+                {initials}
               </div>
               <button
                 type="button"
@@ -111,16 +135,16 @@ function SettingsPage() {
               </button>
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-medium text-foreground">Profile avatar</div>
-              <div className="text-xs text-muted-foreground">PNG or JPG, up to 2 MB.</div>
+              <div className="text-sm font-medium text-foreground">{userName}</div>
+              <div className="text-xs text-muted-foreground">{userEmail}</div>
             </div>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <Field label="Name">
-              <input className={inputCls} defaultValue="Aria Ren" />
+              <input className={inputCls} value={userName} readOnly />
             </Field>
             <Field label="Email">
-              <input type="email" className={inputCls} defaultValue="aria.ren@example.edu" />
+              <input type="email" className={inputCls} value={userEmail} readOnly />
             </Field>
           </div>
         </SectionCard>
@@ -129,8 +153,9 @@ function SettingsPage() {
         <SectionCard eyebrow="Workspace" title="Workspace settings">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Workspace name">
-              <input className={inputCls} defaultValue="Aria's Research" />
+              <input className={inputCls} defaultValue={`${userName.split(" ")[0]}'s Research Workspace`} />
             </Field>
+
             <Field label="Default paper view" hint="How papers appear in your library.">
               <select
                 className={inputCls}

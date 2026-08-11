@@ -69,7 +69,7 @@ export interface PaperResponse {
 
 export interface ClaimWithSource {
   claim_id: string;
-  claim_text: str;
+  claim_text: string;
   section: string;
   page: number;
 }
@@ -148,26 +148,7 @@ export interface QuestionAnsweringResponse {
 }
 
 async function getAuthHeaders(): Promise<HeadersInit> {
-  let token = localStorage.getItem(TOKEN_KEY);
-  if (!token) {
-    try {
-      const regResp = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: `guest_${Math.random().toString(36).substring(2, 9)}@paperlens.local`,
-          password: "GuestPassword123!",
-        }),
-      });
-      if (regResp.ok) {
-        const data = await regResp.json();
-        token = data.access_token;
-        if (token) localStorage.setItem(TOKEN_KEY, token);
-      }
-    } catch {
-      // Ignore registration errors for guest mode fallback
-    }
-  }
+  const token = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -202,151 +183,145 @@ async function handleResponse<T>(response: Response): Promise<T> {
     throw err;
   }
 
-  if (response.status === 24) return {} as T;
-  return (await response.json()) as T;
-}
-
-export async function uploadPaper(file: File): Promise<PaperUploadResponse> {
-  const headers = await getAuthHeaders();
-  const formData = new FormData();
-  formData.append("file", file);
-
+  const text = await response.text();
+  if (!text) return {} as T;
   try {
-    const resp = await fetch(`${API_BASE_URL}/papers/upload`, {
-      method: "POST",
-      headers,
-      body: formData,
-    });
-    return await handleResponse<PaperUploadResponse>(resp);
-  } catch (err: any) {
-    if (!err.status) {
-      throw { status: 0, message: "Network error — failed to connect to backend server." };
-    }
-    throw err;
+    return JSON.parse(text) as T;
+  } catch {
+    return text as unknown as T;
   }
 }
 
-export async function getPaperStatus(paperId: string): Promise<PaperStatusResponse> {
+export async function getMe(): Promise<any> {
   const headers = await getAuthHeaders();
-  try {
-    const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/status`, { headers });
-    return await handleResponse<PaperStatusResponse>(resp);
-  } catch (err: any) {
-    if (!err.status) {
-      throw { status: 0, message: "Network error — failed to connect to backend server." };
-    }
-    throw err;
-  }
+  const resp = await fetch(`${API_BASE_URL}/auth/me`, {
+    headers,
+    credentials: "include",
+  });
+  return await handleResponse<any>(resp);
 }
 
-export async function retryPaperPipeline(paperId: string): Promise<any> {
-  const headers = await getAuthHeaders();
+export async function logoutUser(): Promise<void> {
   try {
-    const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/retry`, {
+    await fetch(`${API_BASE_URL}/auth/logout`, {
       method: "POST",
-      headers,
+      credentials: "include",
     });
-    return await handleResponse<any>(resp);
-  } catch (err: any) {
-    if (!err.status) {
-      throw { status: 0, message: "Network error — failed to connect to backend server." };
-    }
-    throw err;
+  } catch {
+    // Ignore network error on logout
+  }
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem("paperlens_user");
   }
 }
 
 export async function getPapers(): Promise<PaperResponse[]> {
   const headers = await getAuthHeaders();
-  try {
-    const resp = await fetch(`${API_BASE_URL}/papers`, { headers });
-    return await handleResponse<PaperResponse[]>(resp);
-  } catch (err: any) {
-    if (!err.status) {
-      throw { status: 0, message: "Network error — failed to connect to backend server." };
-    }
-    throw err;
-  }
+  const resp = await fetch(`${API_BASE_URL}/papers`, {
+    headers,
+    credentials: "include",
+  });
+  return await handleResponse<PaperResponse[]>(resp);
 }
 
-export async function getPaper(paperId: string): Promise<PaperResponse> {
+export async function getPaperDetail(paperId: string): Promise<PaperResponse> {
   const headers = await getAuthHeaders();
-  try {
-    const resp = await fetch(`${API_BASE_URL}/papers/${paperId}`, { headers });
-    return await handleResponse<PaperResponse>(resp);
-  } catch (err: any) {
-    if (!err.status) {
-      throw { status: 0, message: "Network error — failed to connect to backend server." };
-    }
-    throw err;
+  const resp = await fetch(`${API_BASE_URL}/papers/${paperId}`, {
+    headers,
+    credentials: "include",
+  });
+  return await handleResponse<PaperResponse>(resp);
+}
+
+export async function getPaperStatus(paperId: string): Promise<PaperStatusResponse> {
+  const headers = await getAuthHeaders();
+  const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/status`, {
+    headers,
+    credentials: "include",
+  });
+  return await handleResponse<PaperStatusResponse>(resp);
+}
+
+export async function retryPaperPipeline(paperId: string): Promise<any> {
+  const headers = await getAuthHeaders();
+  const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/retry`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+  });
+  return await handleResponse<any>(resp);
+}
+
+export async function uploadPaper(file: File, workspaceId?: string): Promise<PaperUploadResponse> {
+  const headers = await getAuthHeaders();
+  const formData = new FormData();
+  formData.append("file", file);
+  if (workspaceId) {
+    formData.append("workspace_id", workspaceId);
   }
+
+  const resp = await fetch(`${API_BASE_URL}/papers/upload`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: formData,
+  });
+  return await handleResponse<PaperUploadResponse>(resp);
 }
 
 export async function deletePaper(paperId: string): Promise<void> {
   const headers = await getAuthHeaders();
-  try {
-    const resp = await fetch(`${API_BASE_URL}/papers/${paperId}`, {
-      method: "DELETE",
-      headers,
-    });
-    await handleResponse<void>(resp);
-  } catch (err: any) {
-    if (!err.status) {
-      throw { status: 0, message: "Network error — failed to connect to backend server." };
-    }
-    throw err;
+  const resp = await fetch(`${API_BASE_URL}/papers/${paperId}`, {
+    method: "DELETE",
+    headers,
+    credentials: "include",
+  });
+  if (!resp.ok) {
+    throw await handleResponse<any>(resp);
   }
 }
 
 export async function getPaperAnalysis(paperId: string): Promise<PaperAnalysisResponse> {
   const headers = await getAuthHeaders();
-  try {
-    const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/analysis`, { headers });
-    return await handleResponse<PaperAnalysisResponse>(resp);
-  } catch (err: any) {
-    if (!err.status) {
-      throw { status: 0, message: "Network error — failed to connect to backend server." };
-    }
-    throw err;
-  }
+  const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/analysis`, {
+    headers,
+    credentials: "include",
+  });
+  return await handleResponse<PaperAnalysisResponse>(resp);
 }
 
 export async function getPaperMethodology(paperId: string): Promise<MethodologyExtractionResponse> {
   const headers = await getAuthHeaders();
-  try {
-    const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/methodology`, { headers });
-    return await handleResponse<MethodologyExtractionResponse>(resp);
-  } catch (err: any) {
-    if (!err.status) {
-      throw { status: 0, message: "Network error — failed to connect to backend server." };
-    }
-    throw err;
-  }
+  const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/methodology`, {
+    headers,
+    credentials: "include",
+  });
+  return await handleResponse<MethodologyExtractionResponse>(resp);
 }
 
-export async function getPaperContributions(
-  paperId: string,
-): Promise<ContributionExtractionResponse> {
+export async function getPaperContributions(paperId: string): Promise<ContributionExtractionResponse> {
   const headers = await getAuthHeaders();
-  try {
-    const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/contributions`, { headers });
-    return await handleResponse<ContributionExtractionResponse>(resp);
-  } catch (err: any) {
-    if (!err.status) {
-      throw { status: 0, message: "Network error — failed to connect to backend server." };
-    }
-    throw err;
-  }
+  const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/contributions`, {
+    headers,
+    credentials: "include",
+  });
+  return await handleResponse<ContributionExtractionResponse>(resp);
 }
 
 export async function askPaperQuestion(
   paperId: string,
-  question: string,
+  question: string
 ): Promise<QuestionAnsweringResponse> {
   const headers = await getAuthHeaders();
   try {
     const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/questions`, {
       method: "POST",
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...headers,
+      },
+      credentials: "include",
       body: JSON.stringify({ question }),
     });
     return await handleResponse<QuestionAnsweringResponse>(resp);
@@ -362,24 +337,25 @@ export async function oauthLogin(provider: "google" | "microsoft", email: string
   const resp = await fetch(`${API_BASE_URL}/auth/oauth`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({ provider, email, name, provider_id: providerId }),
   });
   const data = await handleResponse<any>(resp);
-  if (data.access_token) {
+  if (data.access_token && typeof window !== "undefined") {
     localStorage.setItem(TOKEN_KEY, data.access_token);
   }
   return data;
 }
 
 export async function registerUser(email: string, password: string, name?: string): Promise<any> {
-
   const resp = await fetch(`${API_BASE_URL}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({ email, password, name }),
   });
   const data = await handleResponse<any>(resp);
-  if (data.access_token) {
+  if (data.access_token && typeof window !== "undefined") {
     localStorage.setItem(TOKEN_KEY, data.access_token);
   }
   return data;
@@ -387,13 +363,19 @@ export async function registerUser(email: string, password: string, name?: strin
 
 export async function getAdminStats(): Promise<any> {
   const headers = await getAuthHeaders();
-  const resp = await fetch(`${API_BASE_URL}/admin/stats`, { headers });
+  const resp = await fetch(`${API_BASE_URL}/admin/stats`, {
+    headers,
+    credentials: "include",
+  });
   return await handleResponse<any>(resp);
 }
 
 export async function getAdminUsers(): Promise<any[]> {
   const headers = await getAuthHeaders();
-  const resp = await fetch(`${API_BASE_URL}/admin/users`, { headers });
+  const resp = await fetch(`${API_BASE_URL}/admin/users`, {
+    headers,
+    credentials: "include",
+  });
   return await handleResponse<any[]>(resp);
 }
 
@@ -402,9 +384,9 @@ export async function deleteAdminUser(userId: string): Promise<void> {
   const resp = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
     method: "DELETE",
     headers,
+    credentials: "include",
   });
   if (!resp.ok) {
     throw await handleResponse<any>(resp);
   }
 }
-

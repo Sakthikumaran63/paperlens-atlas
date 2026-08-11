@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutGrid,
@@ -10,13 +10,14 @@ import {
   User,
   ShieldCheck,
   LogIn,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 import { AuthModal } from "./AuthModal";
 import { AdminModal } from "./AdminModal";
-
+import { toast } from "sonner";
 
 interface Item {
   label: string;
@@ -65,22 +66,54 @@ function NavRow({ item, active }: { item: Item; active: boolean }) {
 }
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [authOpen, setAuthOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(() => {
-    if (typeof window === "undefined") {
-      return { email: "kkssakthikumaran@gmail.com", name: "Sakthi Kumaran", is_admin: true };
-    }
-    const cached = localStorage.getItem("paperlens_user");
-    return cached ? JSON.parse(cached) : { email: "kkssakthikumaran@gmail.com", name: "Sakthi Kumaran", is_admin: true };
-  });
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    // Hydrate user profile from server session via httpOnly cookie / token
+    import("@/lib/api").then(({ getMe }) => {
+      getMe()
+        .then((user) => {
+          if (user && user.email) {
+            setCurrentUser(user);
+          }
+        })
+        .catch(() => {
+          // If unauthenticated, check cached user as fallback
+          if (typeof window !== "undefined") {
+            const cached = localStorage.getItem("paperlens_user");
+            if (cached) {
+              try {
+                setCurrentUser(JSON.parse(cached));
+              } catch {
+                setCurrentUser(null);
+              }
+            }
+          }
+        });
+    });
+  }, []);
+
+  const handleLogout = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { logoutUser } = await import("@/lib/api");
+    await logoutUser();
+    setCurrentUser(null);
+    toast.success("Signed out successfully");
+    window.location.reload();
+  };
 
   const isActive = (to: string) =>
     to === "/dashboard" ? pathname === "/dashboard" || pathname === "/" : pathname.startsWith(to);
 
   const isAdmin = currentUser?.email?.toLowerCase() === "kkssakthikumaran@gmail.com" || currentUser?.is_admin;
+  const initials = currentUser?.name
+    ? currentUser.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : currentUser?.email
+    ? currentUser.email.slice(0, 2).toUpperCase()
+    : "G";
 
   return (
     <>
@@ -124,27 +157,51 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             ))}
           </nav>
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setAuthOpen(true);
-            }}
-            className="flex w-full items-center gap-3 rounded-md border border-border bg-background px-3 py-2.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 text-left"
-          >
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-border bg-surface text-[11px] font-semibold tracking-wide text-foreground uppercase">
-              {currentUser?.name ? currentUser.name.slice(0, 2) : "SK"}
-            </div>
-            <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate text-sm font-medium text-foreground">
-                {currentUser?.name || "Sakthi Kumaran"}
+          {currentUser ? (
+            <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-left">
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-border bg-surface text-[11px] font-semibold tracking-wide text-foreground uppercase">
+                {initials}
               </div>
-              <div className="truncate text-xs text-muted-foreground">
-                {isAdmin ? "System Administrator" : "Research Fellow"}
+              <div className="min-w-0 flex-1 leading-tight">
+                <div className="truncate text-xs font-medium text-foreground">
+                  {currentUser.name || currentUser.email.split("@")[0]}
+                </div>
+                <div className="truncate text-[10px] text-muted-foreground">
+                  {currentUser.email}
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                title="Sign Out"
+                className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
+              >
+                <LogOut className="h-4 w-4 shrink-0" />
+              </button>
             </div>
-            <LogIn className="h-4 w-4 text-muted-foreground shrink-0" />
-          </button>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setAuthOpen(true);
+              }}
+              className="flex w-full items-center gap-3 rounded-md border border-border bg-background px-3 py-2.5 transition-colors hover:bg-muted text-left"
+            >
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-border bg-surface text-[11px] font-semibold tracking-wide text-foreground uppercase">
+                ?
+              </div>
+              <div className="min-w-0 flex-1 leading-tight">
+                <div className="truncate text-xs font-medium text-foreground">
+                  Guest User
+                </div>
+                <div className="truncate text-[10px] font-semibold text-primary">
+                  Sign In / Register
+                </div>
+              </div>
+              <LogIn className="h-4 w-4 text-primary shrink-0" />
+            </button>
+          )}
         </div>
       </aside>
 
@@ -164,4 +221,5 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     </>
   );
 }
+
 

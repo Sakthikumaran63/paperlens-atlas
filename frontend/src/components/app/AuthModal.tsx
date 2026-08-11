@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { oauthLogin, registerUser } from "@/lib/api";
-import { ShieldCheck, Mail, User as UserIcon, Lock } from "lucide-react";
+import { ShieldCheck, Mail, User as UserIcon, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
@@ -23,9 +23,11 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [oauthEmail, setOauthEmail] = useState("");
   const [oauthName, setOauthName] = useState("");
   const [loading, setLoading] = useState(false);
+
 
   const resetAndClose = () => {
     setView("main");
@@ -45,6 +47,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
       if (mode === "register") {
         const res = await registerUser(email, password, name || undefined);
         localStorage.setItem("paperlens_access_token", res.access_token ?? "");
+        localStorage.setItem("paperlens_user", JSON.stringify(res.user));
         toast.success("Account created successfully!");
         onSuccess(res.user);
       } else {
@@ -56,9 +59,11 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
         if (!resp.ok) throw new Error("Invalid credentials");
         const data = await resp.json();
         localStorage.setItem("paperlens_access_token", data.access_token);
+        localStorage.setItem("paperlens_user", JSON.stringify(data.user));
         toast.success("Logged in successfully!");
         onSuccess(data.user);
       }
+
       resetAndClose();
     } catch (err: any) {
       toast.error(err.message || "Authentication failed.");
@@ -77,8 +82,10 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
       const displayName = oauthName || (provider === "google" ? "Google User" : "Microsoft User");
       const res = await oauthLogin(provider, oauthEmail, displayName, `${provider}_sub_${Date.now()}`);
       localStorage.setItem("paperlens_access_token", res.access_token ?? "");
+      localStorage.setItem("paperlens_user", JSON.stringify(res.user));
       toast.success(`Signed in with ${provider === "google" ? "Google" : "Microsoft"}!`);
       onSuccess(res.user);
+
       resetAndClose();
     } catch (err: any) {
       toast.error(err.message || "OAuth authentication failed.");
@@ -259,19 +266,41 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
               <div className="relative mt-1">
                 <Lock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-8 text-xs"
+                  className="pl-8 pr-10 text-xs"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground focus:outline-none"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
             </div>
 
             <Button type="submit" disabled={loading} className="w-full text-xs font-semibold">
-              {loading ? "Processing..." : mode === "register" ? "Create Account" : "Sign In"}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing...
+                </span>
+              ) : mode === "register" ? (
+                "Create Account"
+              ) : (
+                "Sign In"
+              )}
             </Button>
+
           </form>
         </div>
 
