@@ -1,11 +1,12 @@
 import uuid
 from typing import List, Optional
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
-from app.models.enums import PaperStatus, PipelineStage
+from app.api.deps import get_current_user, get_db, get_workspace_scoped_paper
+from app.core.limiter import limiter
+from app.models.enums import PaperStatus, PipelineStage, RetrievalMode
 from app.models.paper import Paper
 from app.models.user import User
 from app.models.workspace import Workspace
@@ -36,11 +37,13 @@ router = APIRouter()
 
 @router.post("/papers/upload", response_model=PaperUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_paper(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     workspace_id: Optional[uuid.UUID] = Form(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> PaperUploadResponse:
+
     """
     Upload a research paper (PDF only, max 20 MB).
     Validates MIME type, extension, size limit, and sanitizes filenames.
@@ -73,12 +76,17 @@ async def upload_paper(
         workspace_id=target_workspace.id,
         title=original_filename,
         file_name=original_filename,
+        file_path=stored_filename,
         file_size=file_size,
         status=PaperStatus.UPLOADED
     )
     db.add(new_paper)
     await db.commit()
     await db.refresh(new_paper)
+
+    # 4. Launch background pipeline processing asynchronously
+    orchestrator = PaperPipelineOrchestrator()
+    background_tasks.add_task(orchestrator.run_pipeline, new_paper.id)
 
     return PaperUploadResponse(
         paper_id=new_paper.id,
@@ -87,39 +95,58 @@ async def upload_paper(
     )
 
 
+@router.get("/papers/{paper_id}/status", response_model=PaperStatusResponse)
+async def get_paper_status_endpoint(
+    paper: Paper = Depends(get_workspace_scoped_paper)
+) -> PaperStatusResponse:
+    """
+    Retrieve real-time processing pipeline status, progress percentage, stage details, and error message.
+    """
+    return PaperStatusResponse(
+        paper_id=paper.id,
+        status=paper.status,
+        stage=paper.stage,
+        progress=paper.progress,
+        stages_detail=paper.stage_details_json,
+        processing_error=paper.processing_error
+    )
+
+
+@router.post("/papers/{paper_id}/retry")
+async def retry_paper_pipeline_endpoint(
+    background_tasks: BackgroundTasks,
+    paper: Paper = Depends(get_workspace_scoped_paper)
+) -> dict:
+    """
+    Retry processing pipeline for a paper.
+    """
+    orchestrator = PaperPipelineOrchestrator()
+    background_tasks.add_task(orchestrator.run_pipeline, paper.id, True)
+
+    return {
+        "message": "Paper pipeline retry launched successfully.",
+        "paper_id": str(paper.id),
+        "status": PaperStatus.PROCESSING
+    }
+
+
 @router.post("/papers/{paper_id}/process", response_model=PaperResponse)
 async def process_paper_endpoint(
-    paper_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    paper: Paper = Depends(get_workspace_scoped_paper),
     db: AsyncSession = Depends(get_db)
 ) -> PaperResponse:
     """
     Trigger text extraction and scientific section processing for an uploaded PDF paper.
     Updates status from UPLOADED -> PROCESSING -> READY (or FAILED).
     """
-    stmt = (
-        select(Paper)
-        .join(Workspace, Paper.workspace_id == Workspace.id)
-        .where(Paper.id == paper_id, Workspace.user_id == current_user.id)
-    )
-    result = await db.execute(stmt)
-    paper = result.scalar_one_or_none()
-
-    if not paper:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paper not found or access denied."
-        )
-
     processed_paper = await process_paper(paper.id, db)
     return PaperResponse.model_validate(processed_paper)
 
 
 @router.post("/papers/{paper_id}/index", response_model=PaperResponse)
 async def index_paper_endpoint(
-    paper_id: uuid.UUID,
     force_reindex: bool = False,
-    current_user: User = Depends(get_current_user),
+    paper: Paper = Depends(get_workspace_scoped_paper),
     db: AsyncSession = Depends(get_db)
 ) -> PaperResponse:
     """
@@ -127,29 +154,14 @@ async def index_paper_endpoint(
     Batches chunk vector generation and updates paper status: PROCESSING -> READY (or FAILED).
     Allows force_reindex query parameter.
     """
-    stmt = (
-        select(Paper)
-        .join(Workspace, Paper.workspace_id == Workspace.id)
-        .where(Paper.id == paper_id, Workspace.user_id == current_user.id)
-    )
-    result = await db.execute(stmt)
-    paper = result.scalar_one_or_none()
-
-    if not paper:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paper not found or access denied."
-        )
-
     indexed_paper = await index_paper(paper.id, db, force_reindex=force_reindex)
     return PaperResponse.model_validate(indexed_paper)
 
 
 @router.post("/papers/{paper_id}/retrieve", response_model=List[RetrievedChunkCandidate])
 async def retrieve_paper_evidence_endpoint(
-    paper_id: uuid.UUID,
     req: RetrievalRequest,
-    current_user: User = Depends(get_current_user),
+    paper: Paper = Depends(get_workspace_scoped_paper),
     db: AsyncSession = Depends(get_db)
 ) -> List[RetrievedChunkCandidate]:
     """
@@ -157,21 +169,6 @@ async def retrieve_paper_evidence_endpoint(
     Supports BASELINE_RAG (semantic only) and STRUCTURE_AWARE_RAG (combined weighted scoring) modes.
     Returns detailed scores: semantic_score, section_score, keyword_score, final_score, page, section, text.
     """
-    # Verify paper & workspace ownership
-    stmt = (
-        select(Paper)
-        .join(Workspace, Paper.workspace_id == Workspace.id)
-        .where(Paper.id == paper_id, Workspace.user_id == current_user.id)
-    )
-    result = await db.execute(stmt)
-    paper = result.scalar_one_or_none()
-
-    if not paper:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paper not found or access denied."
-        )
-
     retrieval_strategy_svc = StructureAwareRetrievalService()
     candidates = await retrieval_strategy_svc.retrieve_pipeline(
         query=req.query,
@@ -188,29 +185,13 @@ async def retrieve_paper_evidence_endpoint(
 
 @router.post("/papers/{paper_id}/evidence", response_model=EvidencePackage)
 async def select_paper_evidence_endpoint(
-    paper_id: uuid.UUID,
     req: RetrievalRequest,
-    current_user: User = Depends(get_current_user),
+    paper: Paper = Depends(get_workspace_scoped_paper),
     db: AsyncSession = Depends(get_db)
 ) -> EvidencePackage:
     """
     Retrieve ranked candidates and transform them into a compact, deduplicated, token-budgeted, auditable evidence package for the LLM.
     """
-    # Verify paper & workspace ownership
-    stmt = (
-        select(Paper)
-        .join(Workspace, Paper.workspace_id == Workspace.id)
-        .where(Paper.id == paper_id, Workspace.user_id == current_user.id)
-    )
-    result = await db.execute(stmt)
-    paper = result.scalar_one_or_none()
-
-    if not paper:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paper not found or access denied."
-        )
-
     retrieval_strategy_svc = StructureAwareRetrievalService()
     candidates = await retrieval_strategy_svc.retrieve_pipeline(
         query=req.query,
@@ -229,9 +210,8 @@ async def select_paper_evidence_endpoint(
 
 @router.post("/papers/{paper_id}/ask", response_model=GroundedAnswerResponse)
 async def ask_paper_question_endpoint(
-    paper_id: uuid.UUID,
     req: AskQuestionRequest,
-    current_user: User = Depends(get_current_user),
+    paper: Paper = Depends(get_workspace_scoped_paper),
     db: AsyncSession = Depends(get_db)
 ) -> GroundedAnswerResponse:
     """
@@ -239,21 +219,6 @@ async def ask_paper_question_endpoint(
     Executes pipeline: Question Classification -> Structure-Aware Retrieval -> Evidence Selection -> Candidate Answer -> Evidence Verification -> Final Answer OR Abstention.
     Returns verified response with support_score, supported, searched_sections, evidence_count, and abstention_reason.
     """
-    # Verify paper & workspace ownership
-    stmt = (
-        select(Paper)
-        .join(Workspace, Paper.workspace_id == Workspace.id)
-        .where(Paper.id == paper_id, Workspace.user_id == current_user.id)
-    )
-    result = await db.execute(stmt)
-    paper = result.scalar_one_or_none()
-
-    if not paper:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paper not found or access denied."
-        )
-
     answer_gen_svc = AnswerGenerationService()
     try:
         response = await answer_gen_svc.generate_answer_for_paper(
@@ -271,10 +236,11 @@ async def ask_paper_question_endpoint(
 
 
 @router.post("/papers/{paper_id}/questions", response_model=QuestionAnsweringResponse)
+@limiter.limit("30/minute")
 async def ask_paper_questions_main_endpoint(
-    paper_id: uuid.UUID,
+    request: Request,
     req: QuestionAnsweringRequest,
-    current_user: User = Depends(get_current_user),
+    paper: Paper = Depends(get_workspace_scoped_paper),
     db: AsyncSession = Depends(get_db)
 ) -> QuestionAnsweringResponse:
     """
@@ -286,21 +252,6 @@ async def ask_paper_questions_main_endpoint(
     12. Persist question -> 13. Persist retrieved evidence -> 14. Persist answer -> 15. Persist answer-evidence relationships.
     Returns database-bound evidence sources metadata.
     """
-    # 1 & 2. Authenticate user & Verify paper ownership
-    stmt = (
-        select(Paper)
-        .join(Workspace, Paper.workspace_id == Workspace.id)
-        .where(Paper.id == paper_id, Workspace.user_id == current_user.id)
-    )
-    result = await db.execute(stmt)
-    paper = result.scalar_one_or_none()
-
-    if not paper:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paper not found or access denied."
-        )
-
     # 3. Validate paper is indexed (PaperStatus.READY)
     if paper.status != PaperStatus.READY:
         raise HTTPException(
@@ -327,8 +278,7 @@ async def ask_paper_questions_main_endpoint(
 
 @router.get("/papers/{paper_id}/analysis", response_model=PaperAnalysisResponse)
 async def get_paper_analysis_endpoint(
-    paper_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    paper: Paper = Depends(get_workspace_scoped_paper),
     db: AsyncSession = Depends(get_db)
 ) -> PaperAnalysisResponse:
     """
@@ -336,21 +286,6 @@ async def get_paper_analysis_endpoint(
     Returns 10-field structured summary (Executive Summary, Problem Statement, Objective, Methodology,
     Key Contributions, Dataset, Experimental Setup, Key Results, Limitations, Conclusion) and claim source lineage.
     """
-    # Verify paper & workspace ownership
-    stmt = (
-        select(Paper)
-        .join(Workspace, Paper.workspace_id == Workspace.id)
-        .where(Paper.id == paper_id, Workspace.user_id == current_user.id)
-    )
-    result = await db.execute(stmt)
-    paper = result.scalar_one_or_none()
-
-    if not paper:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paper not found or access denied."
-        )
-
     summary_svc = SummaryService()
     analysis = await summary_svc.generate_structured_analysis(paper_id=paper.id, db=db)
 
@@ -380,8 +315,7 @@ async def get_paper_analysis_endpoint(
 
 @router.get("/papers/{paper_id}/methodology", response_model=MethodologyExtractionResponse)
 async def get_paper_methodology_endpoint(
-    paper_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    paper: Paper = Depends(get_workspace_scoped_paper),
     db: AsyncSession = Depends(get_db)
 ) -> MethodologyExtractionResponse:
     """
@@ -389,21 +323,6 @@ async def get_paper_methodology_endpoint(
     Identifies research approach, model/architecture, algorithms, dataset, preprocessing, training procedure,
     experimental setup, evaluation metrics, and evidence source lineage (section & page).
     """
-    # Verify paper & workspace ownership
-    stmt = (
-        select(Paper)
-        .join(Workspace, Paper.workspace_id == Workspace.id)
-        .where(Paper.id == paper_id, Workspace.user_id == current_user.id)
-    )
-    result = await db.execute(stmt)
-    paper = result.scalar_one_or_none()
-
-    if not paper:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paper not found or access denied."
-        )
-
     methodology_svc = MethodologyExtractionService()
     extraction = await methodology_svc.extract_methodology(paper_id=paper.id, db=db)
     return extraction
@@ -411,8 +330,7 @@ async def get_paper_methodology_endpoint(
 
 @router.get("/papers/{paper_id}/contributions", response_model=ContributionExtractionResponse)
 async def get_paper_contributions_endpoint(
-    paper_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    paper: Paper = Depends(get_workspace_scoped_paper),
     db: AsyncSession = Depends(get_db)
 ) -> ContributionExtractionResponse:
     """
@@ -420,21 +338,6 @@ async def get_paper_contributions_endpoint(
     Identifies explicit and evidence-supported inferred contributions, prioritizing Introduction, Abstract, Conclusion,
     and Methodology sections, and binds evidence source lineage (page, section, chunk_id).
     """
-    # Verify paper & workspace ownership
-    stmt = (
-        select(Paper)
-        .join(Workspace, Paper.workspace_id == Workspace.id)
-        .where(Paper.id == paper_id, Workspace.user_id == current_user.id)
-    )
-    result = await db.execute(stmt)
-    paper = result.scalar_one_or_none()
-
-    if not paper:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paper not found or access denied."
-        )
-
     contrib_svc = ContributionExtractionService()
     extraction = await contrib_svc.extract_contributions(paper_id=paper.id, db=db)
     return extraction
@@ -442,9 +345,8 @@ async def get_paper_contributions_endpoint(
 
 @router.post("/papers/{paper_id}/evaluate", response_model=EvaluationBenchmarkReport)
 async def evaluate_paper_endpoint(
-    paper_id: uuid.UUID,
     dataset: Optional[EvaluationDataset] = None,
-    current_user: User = Depends(get_current_user),
+    paper: Paper = Depends(get_workspace_scoped_paper),
     db: AsyncSession = Depends(get_db)
 ) -> EvaluationBenchmarkReport:
     """
@@ -452,21 +354,6 @@ async def evaluate_paper_endpoint(
     Compares BASELINE_RAG vs STRUCTURE_AWARE_RAG vs STRUCTURE_AWARE_RAG + EVIDENCE_VERIFICATION across
     Retrieval (Recall@K, Precision@K, MRR), Answer, Grounding, and Abstention metrics.
     """
-    # Verify paper & workspace ownership
-    stmt = (
-        select(Paper)
-        .join(Workspace, Paper.workspace_id == Workspace.id)
-        .where(Paper.id == paper_id, Workspace.user_id == current_user.id)
-    )
-    result = await db.execute(stmt)
-    paper = result.scalar_one_or_none()
-
-    if not paper:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paper not found or access denied."
-        )
-
     eval_svc = EvaluationService()
     target_dataset = dataset or eval_svc.generate_sample_evaluation_dataset(paper_id=paper.id)
 
@@ -507,56 +394,27 @@ async def list_papers(
 
 @router.get("/papers/{paper_id}", response_model=PaperResponse)
 async def get_paper_detail(
-    paper_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    paper: Paper = Depends(get_workspace_scoped_paper)
 ) -> PaperResponse:
     """
     Retrieve metadata for a specific paper.
     Requires workspace ownership.
     """
-    stmt = (
-        select(Paper)
-        .join(Workspace, Paper.workspace_id == Workspace.id)
-        .where(Paper.id == paper_id, Workspace.user_id == current_user.id)
-    )
-    result = await db.execute(stmt)
-    paper = result.scalar_one_or_none()
-
-    if not paper:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paper not found or access denied."
-        )
-
     return PaperResponse.model_validate(paper)
 
 
 @router.delete("/papers/{paper_id}", status_code=status.HTTP_200_OK)
 async def delete_paper(
-    paper_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    paper: Paper = Depends(get_workspace_scoped_paper),
     db: AsyncSession = Depends(get_db)
 ) -> dict:
     """
     Delete a paper database record and remove its stored file.
     Requires authentication and workspace ownership.
     """
-    stmt = (
-        select(Paper)
-        .join(Workspace, Paper.workspace_id == Workspace.id)
-        .where(Paper.id == paper_id, Workspace.user_id == current_user.id)
-    )
-    result = await db.execute(stmt)
-    paper = result.scalar_one_or_none()
-
-    if not paper:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paper not found or access denied."
-        )
-
+    pid = paper.id
     await db.delete(paper)
     await db.commit()
 
-    return {"detail": "Paper deleted successfully.", "paper_id": str(paper_id)}
+    return {"detail": "Paper deleted successfully.", "paper_id": str(pid)}
+

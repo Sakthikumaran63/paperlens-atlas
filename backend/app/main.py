@@ -78,10 +78,24 @@ async def lifespan(app: FastAPI):
         logger.info("SQLite mode: all tables created via create_all.")
     else:
         run_db_migrations()
+
+    # Reconcile stalled pipeline jobs on startup
+    try:
+        from app.db.session import async_session_factory
+        from app.services.pipeline_reconciler import reconcile_stuck_papers
+        async with async_session_factory() as session:
+            await reconcile_stuck_papers(session)
+    except Exception as rec_err:
+        logger.warning(f"Initial pipeline reconciliation skipped: {rec_err}")
+
     yield
     logger.info(f"Shutting down {settings.PROJECT_NAME}...")
 
 
+
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+from app.core.limiter import limiter
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -90,6 +104,9 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware configuration
 if settings.CORS_ORIGINS:

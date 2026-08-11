@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_current_user_strict, get_db
+from app.core.config import settings
+from app.core.limiter import limiter
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.models.user import User
 from app.models.workspace import Workspace
@@ -12,10 +14,31 @@ from app.schemas.user import OAuthLoginRequest, UserCreate, UserLogin, UserRespo
 router = APIRouter()
 
 ADMIN_EMAIL = "kkssakthikumaran@gmail.com"
+COOKIE_NAME = "paperlens_token"
+COOKIE_MAX_AGE = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+
+
+def _set_auth_cookie(response: Response, token: str):
+    """Set secure httpOnly JWT cookie."""
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        max_age=COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        secure=settings.ENV == "production",
+        path="/"
+    )
 
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
-async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)) -> Token:
+@limiter.limit("10/minute")
+async def register(
+    request: Request,
+    response: Response,
+    user_in: UserCreate,
+    db: AsyncSession = Depends(get_db)
+) -> Token:
     email_clean = user_in.email.lower().strip()
     stmt = select(User).where(User.email == email_clean)
     result = await db.execute(stmt)
@@ -50,13 +73,18 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)) -> T
     await db.refresh(new_user)
 
     access_token = create_access_token(subject=new_user.id)
+    _set_auth_cookie(response, access_token)
     user_response = UserResponse.model_validate(new_user)
 
     return Token(access_token=access_token, token_type="bearer", user=user_response)
 
 
 @router.post("/oauth", response_model=Token)
-async def oauth_login(oauth_in: OAuthLoginRequest, db: AsyncSession = Depends(get_db)) -> Token:
+async def oauth_login(
+    response: Response,
+    oauth_in: OAuthLoginRequest,
+    db: AsyncSession = Depends(get_db)
+) -> Token:
     """
     OAuth login & registration endpoint for Google and Microsoft.
     Auto-registers new users, sets is_admin=True for kkssakthikumaran@gmail.com.
@@ -97,13 +125,20 @@ async def oauth_login(oauth_in: OAuthLoginRequest, db: AsyncSession = Depends(ge
             await db.refresh(user)
 
     access_token = create_access_token(subject=user.id)
+    _set_auth_cookie(response, access_token)
     user_response = UserResponse.model_validate(user)
 
     return Token(access_token=access_token, token_type="bearer", user=user_response)
 
 
 @router.post("/login", response_model=Token)
-async def login(user_in: UserLogin, db: AsyncSession = Depends(get_db)) -> Token:
+@limiter.limit("20/minute")
+async def login(
+    request: Request,
+    response: Response,
+    user_in: UserLogin,
+    db: AsyncSession = Depends(get_db)
+) -> Token:
     email_clean = user_in.email.lower().strip()
     stmt = select(User).where(User.email == email_clean)
     result = await db.execute(stmt)
@@ -123,14 +158,21 @@ async def login(user_in: UserLogin, db: AsyncSession = Depends(get_db)) -> Token
         await db.refresh(user)
 
     access_token = create_access_token(subject=user.id)
+    _set_auth_cookie(response, access_token)
     user_response = UserResponse.model_validate(user)
 
     return Token(access_token=access_token, token_type="bearer", user=user_response)
 
 
-from app.api.deps import get_current_user_strict, get_db
+@router.post("/logout")
+async def logout(response: Response):
+    """Clear the httpOnly authentication cookie."""
+    response.delete_cookie(key=COOKIE_NAME, path="/")
+    return {"status": "ok", "message": "Successfully logged out"}
+
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user_strict)) -> UserResponse:
     return UserResponse.model_validate(current_user)
+
 

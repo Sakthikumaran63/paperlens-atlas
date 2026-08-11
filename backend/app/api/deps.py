@@ -1,6 +1,6 @@
 import uuid
-from typing import AsyncGenerator
-from fastapi import Depends, HTTPException, status
+from typing import Optional
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,15 +11,23 @@ from app.models.paper import Paper
 from app.models.user import User
 from app.models.workspace import Workspace
 
-from typing import Optional
-
 reusable_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
+def _extract_token(request: Request, header_token: Optional[str]) -> Optional[str]:
+    """Extract token from httpOnly cookie 'paperlens_token' first, falling back to Authorization header."""
+    cookie_token = request.cookies.get("paperlens_token")
+    if cookie_token:
+        return cookie_token
+    return header_token
+
+
 async def get_current_user_strict(
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    token: Optional[str] = Depends(reusable_oauth2)
+    header_token: Optional[str] = Depends(reusable_oauth2)
 ) -> User:
+    token = _extract_token(request, header_token)
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -51,10 +59,11 @@ async def get_current_user_strict(
 
 
 async def get_current_user(
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    token: Optional[str] = Depends(reusable_oauth2)
+    header_token: Optional[str] = Depends(reusable_oauth2)
 ) -> User:
-
+    token = _extract_token(request, header_token)
     if token:
         payload = decode_access_token(token)
         if payload and payload.get("sub"):
@@ -96,7 +105,6 @@ async def get_current_user(
     return demo_user
 
 
-
 async def get_current_workspace(
     workspace_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -108,9 +116,16 @@ async def get_current_workspace(
     )
     result = await db.execute(stmt)
     workspace = result.scalar_one_or_none()
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found or access denied."
+        )
+    return workspace
+
 
 async def require_admin(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user_strict)
 ) -> User:
     if not current_user.is_admin:
         raise HTTPException(
@@ -120,16 +135,22 @@ async def require_admin(
     return current_user
 
 
-
-async def verify_paper_access(
-    workspace_id: uuid.UUID,
+async def get_workspace_scoped_paper(
     paper_id: uuid.UUID,
-    workspace: Workspace = Depends(get_current_workspace),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> Paper:
-    stmt = select(Paper).where(
-        Paper.id == paper_id,
-        Paper.workspace_id == workspace.id
+    """
+    Enforces strict workspace isolation at the query level.
+    Returns 404 (not 403) to prevent IDOR information disclosure of existence across workspaces.
+    """
+    stmt = (
+        select(Paper)
+        .join(Workspace, Paper.workspace_id == Workspace.id)
+        .where(
+            Paper.id == paper_id,
+            Workspace.user_id == current_user.id
+        )
     )
     result = await db.execute(stmt)
     paper = result.scalar_one_or_none()
@@ -137,6 +158,7 @@ async def verify_paper_access(
     if paper is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paper not found or access denied."
+            detail="Paper not found"
         )
     return paper
+
