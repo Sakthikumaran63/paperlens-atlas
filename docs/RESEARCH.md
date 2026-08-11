@@ -28,10 +28,10 @@ PDF ──► Section Taxonomy ──► Structure-Aware Chunks ──► Questi
 ```
 
 ### Core Research Contributions
-1. **Structure-Aware Retrieval Routing**: Question intent classification maps queries to a 14-type taxonomy (`DATASET`, `METHODOLOGY`, `RESULT`, `LIMITATION`, etc.) and dynamically adjusts retrieval scoring using a composite function:
-   $$\text{final\_score} = (\text{semantic\_score} \times 0.60) + (\text{section\_score} \times 0.25) + (\text{keyword\_score} \times 0.15)$$
-2. **Database Provenance Binding**: Metadata (`page_number`, `section_title`, `chunk_id`) is owned exclusively by PostgreSQL. Source passages displayed to users originate strictly from database records, preventing LLM citation fabrications.
-3. **Controlled Uncertainty & Evidence Verification**: An explicit verification layer (`EvidenceVerificationService`) evaluates candidate answers against retrieved evidence package snippets. If the computed support score falls below threshold ($0.70$), the system forces a controlled abstention:
+1. **Structure-Aware Retrieval Routing with BM25 Keyword Scoring**: Question intent classification maps queries to a 14-type taxonomy (`DATASET`, `METHODOLOGY`, `RESULT`, `LIMITATION`, etc.) and dynamically adjusts retrieval scoring using a composite function combining semantic vector similarity, section taxonomy routing, and normalized BM25 Okapi keyword scoring:
+   $$\text{final\_score} = (\text{semantic\_score} \times 0.60) + (\text{section\_score} \times 0.25) + (\text{bm25\_score} \times 0.15)$$
+2. **Database Provenance Binding & Fuzzy Quote Verification**: Metadata (`page_number`, `section_title`, `chunk_id`) is owned exclusively by PostgreSQL / SQLite. Every cited quote is verified against source chunk content via exact substring matching and `RapidFuzz` partial ratio ($S_{\text{match}} \ge 90$) before persisting `AnswerEvidence` records. Fabricated quotes are rejected, preventing LLM citation fabrications.
+3. **Controlled Uncertainty & Evidence Verification**: An explicit verification layer (`EvidenceVerificationService`) evaluates candidate answers against retrieved evidence package snippets. If the computed support score falls below threshold ($0.70$) or if no verifiable citations survive, the system forces a controlled abstention:
    *"I couldn't find enough information in the uploaded paper to answer this reliably."*
 
 ---
