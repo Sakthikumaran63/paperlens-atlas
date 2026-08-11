@@ -44,8 +44,9 @@ Answer / Abstention (with Page + Section Provenance)
 
 ## Documentation Directory
 
-The complete technical specification of PaperLens is organized into specialized reference documents in [`docs/`](file:///d:/sakthi/paperlens-atlas/docs/):
+The complete technical specification of PaperLens is organized into specialized reference documents:
 
+* **[Master Technical Documentation](DOCUMENTATION.md)** — Exhaustive architecture, database models, processing pipeline, RAG engine, offline AI mechanics, and REST API specs.
 * **[Product Specification](docs/PRODUCT_SPEC.md)** — Core identity, product philosophy, target users, features, workflow, and scope boundaries.
 * **[System Architecture](docs/ARCHITECTURE.md)** — Monorepo structure, frontend/backend architecture, processing pipeline, RAG engine, database schema, and evidence lineage.
 * **[Research Novelty & Vision](docs/RESEARCH.md)** — Research novelty, structure-aware retrieval vs baseline RAG, hypotheses, and long-term vision.
