@@ -81,6 +81,20 @@ class LLMService:
                 abstain=True
             )
 
+        # Offline fallback when no LLM API key is configured
+        if not settings.LLM_API_KEY:
+            logger.info("No LLM_API_KEY configured; using offline extractive Q&A fallback.")
+            from app.services.offline_ai import generate_offline_answer
+            evidence_dicts = [
+                {
+                    "text": item.text,
+                    "evidence_id": item.evidence_id,
+                }
+                for item in evidence_package.items
+            ]
+            result = generate_offline_answer(question_text, evidence_dicts)
+            return LLMAnswerOutput.model_validate(result)
+
         system_prompt = self._build_grounding_system_prompt(question_type)
         user_prompt = self._build_user_prompt(question_text, question_type, evidence_package)
 

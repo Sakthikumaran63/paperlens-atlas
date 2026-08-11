@@ -172,6 +172,32 @@ class AnswerGenerationService:
                         )
                     )
 
+            # Verification of cited quotes against actual chunk content
+            chunk_text_map = {str(c.chunk_id): c.text for c in candidates}
+            verified_source_items: list[SourceMetadataItem] = []
+            verified_bound_items: list[AnswerEvidenceItem] = []
+
+            for src, b_item in zip(source_items, bound_evidence_items):
+                chunk_content = chunk_text_map.get(str(b_item.chunk_id), b_item.text)
+                if ver_svc.verify_quote(quote_text=b_item.text, chunk_content=chunk_content):
+                    verified_source_items.append(src)
+                    verified_bound_items.append(b_item)
+                else:
+                    logger.warning(
+                        "Rejected unverified citation quote for paper_id=%s, chunk_id=%s",
+                        paper.id, b_item.chunk_id
+                    )
+
+            if not verified_source_items:
+                abstained = True
+                final_answer = REFUSAL_MESSAGE
+                abstention_reason = "Answer contained unverifiable citations not found in document text."
+                source_items = []
+                bound_evidence_items = []
+            else:
+                source_items = verified_source_items
+                bound_evidence_items = verified_bound_items
+
         # 12. Persist question DB record
         db_question = Question(
             workspace_id=paper.workspace_id,
@@ -183,35 +209,41 @@ class AnswerGenerationService:
         db.add(db_question)
         await db.flush()
 
-        # 13. Persist retrieved evidence DB records
+        # 13. Persist retrieved evidence DB records and build chunk->ret_ev mapping
+        chunk_to_ret_ev: dict[str, uuid.UUID] = {}
         for idx, cand in enumerate(candidates[:6]):
             ret_ev = RetrievedEvidence(
                 question_id=db_question.id,
                 chunk_id=cand.chunk_id,
                 rank=idx + 1,
-                similarity_score=cand.similarity_score,
-                final_score=cand.final_score
+                similarity_score=cand.similarity_score
             )
             db.add(ret_ev)
+            await db.flush()  # flush to get ret_ev.id
+            chunk_to_ret_ev[str(cand.chunk_id)] = ret_ev.id
+
 
         # 14. Persist answer DB record
         db_answer = Answer(
             question_id=db_question.id,
             answer_text=final_answer,
-            confidence=verification.support_score,
-            abstain=abstained
+            is_abstained=abstained,
+            abstention_reason=abstention_reason
         )
         db.add(db_answer)
         await db.flush()
 
+
         # 15. Persist answer-evidence relationship DB records
         for b_item in bound_evidence_items:
-            ans_ev = AnswerEvidence(
-                answer_id=db_answer.id,
-                chunk_id=b_item.chunk_id,
-                citation_key=b_item.evidence_id
-            )
-            db.add(ans_ev)
+            ret_ev_id = chunk_to_ret_ev.get(str(b_item.chunk_id))
+            if ret_ev_id:
+                ans_ev = AnswerEvidence(
+                    answer_id=db_answer.id,
+                    retrieved_evidence_id=ret_ev_id,
+                    quote_text=b_item.text[:500] if b_item.text else None
+                )
+                db.add(ans_ev)
 
         await db.commit()
 

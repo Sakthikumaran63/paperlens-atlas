@@ -39,6 +39,23 @@ class StructureAwareRetrievalService:
         overlap_ratio = len(matches) / len(query_words)
         return min(1.0, max(0.0, overlap_ratio))
 
+    def calculate_bm25_scores(self, query: str, candidate_texts: List[str]) -> List[float]:
+        if not query or not candidate_texts:
+            return [0.0] * len(candidate_texts)
+
+        try:
+            from rank_bm25 import BM25Okapi
+            tokenized_corpus = [re.findall(r'\b[a-zA-Z0-9]{2,}\b', t.lower()) for t in candidate_texts]
+            bm25 = BM25Okapi(tokenized_corpus)
+            query_tokens = re.findall(r'\b[a-zA-Z0-9]{2,}\b', query.lower())
+            if not query_tokens:
+                return [0.0] * len(candidate_texts)
+            scores = bm25.get_scores(query_tokens)
+            max_score = max(scores) if len(scores) and max(scores) > 0 else 1.0
+            return [float(s / max_score) for s in scores]
+        except Exception:
+            return [self.calculate_keyword_score(query, t) for t in candidate_texts]
+
     def calculate_section_score(self, chunk_sec_type: SectionType, priorities: List[SectionType]) -> float:
         if not priorities:
             return 0.50
@@ -93,17 +110,22 @@ class StructureAwareRetrievalService:
                 db=db
             )
 
+        if not raw_candidates:
+            return []
+
         processed_candidates: List[RetrievedChunkCandidate] = []
 
-        # 3. Section-Aware & Keyword Scoring
+        # 3. Section-Aware & BM25 Keyword Scoring
         sem_weight = settings.RETRIEVAL_SEMANTIC_WEIGHT
         sec_weight = settings.RETRIEVAL_SECTION_WEIGHT
         kw_weight = settings.RETRIEVAL_KEYWORD_WEIGHT
 
-        for cand in raw_candidates:
+        candidate_texts = [c.text for c in raw_candidates]
+        bm25_scores = self.calculate_bm25_scores(query, candidate_texts)
+
+        for cand, kw_score in zip(raw_candidates, bm25_scores):
             sem_score = cand.similarity_score
             sec_score = self.calculate_section_score(cand.section_type, priorities)
-            kw_score = self.calculate_keyword_score(query, cand.text)
 
             if mode == RetrievalMode.BASELINE_RAG:
                 fin_score = sem_score

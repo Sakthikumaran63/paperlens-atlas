@@ -28,11 +28,16 @@ async def test_paper_pipeline_orchestrator_full_execution(
     ws_res = await db_session.execute(ws_stmt)
     workspace = ws_res.scalar_one()
 
-    # 2. Create uploaded Paper record
+    # 2. Create dummy PDF on disk & uploaded Paper record
+    from app.utils.storage import get_upload_dir
+    test_pdf_path = get_upload_dir() / "pipeline_test.pdf"
+    test_pdf_path.write_bytes(b"%PDF-1.5\n%...\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 44 >>\nstream\nBT /F1 12 Tf 72 712 Td (Hello World) Tj ET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f \n0000000009 00000 n \n0000000062 00000 n \n0000000125 00000 n \n0000000224 00000 n \ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n318\n%%EOF")
+
     paper = Paper(
         workspace_id=workspace.id,
         title="Pipeline Test Paper",
         file_name="pipeline_test.pdf",
+        file_path="pipeline_test.pdf",
         file_size=512,
         status=PaperStatus.UPLOADED,
         stage=PipelineStage.UPLOADING,
@@ -43,7 +48,9 @@ async def test_paper_pipeline_orchestrator_full_execution(
 
     # 3. Execute Orchestrator run_pipeline directly
     orchestrator = PaperPipelineOrchestrator()
-    await orchestrator.run_pipeline(paper.id)
+
+    await orchestrator.run_pipeline(paper.id, db=db_session)
+
 
     # 4. Verify Paper final status, stage, and progress
     updated_paper = (await db_session.execute(select(Paper).where(Paper.id == paper.id))).scalar_one()

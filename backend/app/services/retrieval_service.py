@@ -65,12 +65,15 @@ class RetrievalService:
             chunk_id=chunk.id,
             paper_id=chunk.paper_id,
             page_number=chunk.page_number,
+            page=chunk.page_number,
             section_id=sec_id or chunk.section_id,
             section_type=sec_type,
             section_title=sec_title,
+            section=sec_title,
             text=chunk.text,
             similarity_score=round(float(sim_score), 4)
         )
+
 
     async def retrieve(
         self,

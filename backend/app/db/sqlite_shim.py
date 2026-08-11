@@ -1,50 +1,138 @@
-import logging
-import sqlalchemy.dialects.postgresql as _pg
-from sqlalchemy import String, JSON as _JSON
-from app.core.config import settings
+"""SQLite compatibility shim for Postgres-only column types.
 
-logger = logging.getLogger("paperlens")
+PaperLens Atlas models declare columns using `postgresql.UUID` and
+`pgvector.sqlalchemy.Vector` directly (in addition to the portable `GUID`
+type in `types.py`), because those types carry Postgres-specific semantics
+(native UUID storage, ANN vector search) in production.
 
+When running locally against SQLite, neither type has a native SQLite
+counterpart, so SQLAlchemy raises a compile error the moment it tries to
+emit DDL or bind a parameter. This module monkey-patches both types so
+they degrade gracefully on SQLite:
+
+- `postgresql.UUID`  -> compiled as `CHAR(36)`, values stored as canonical
+                        UUID strings, always returned as `uuid.UUID`.
+- `pgvector.sqlalchemy.Vector` -> compiled as `TEXT`, values stored as a
+                        JSON-encoded list of floats, returned as a
+                        plain Python list on read.
+
+IMPORTANT: call `patch_sqlite_types()` once, before any SQLite engine is
+created (e.g. at the top of `env.py` for Alembic, or in your app's
+settings/bootstrap module, gated behind a "using SQLite locally" check).
+Patching is a no-op against a real Postgres connection since the patched
+processors only activate when `dialect.name == "sqlite"`.
+
+Example:
+    # app/db/session.py
+    from app.core.config import settings
+
+    if settings.DATABASE_URL.startswith("sqlite"):
+        from app.db.sqlite_shim import patch_sqlite_types
+        patch_sqlite_types()
+"""
+from __future__ import annotations
+
+import json
 import uuid
-from sqlalchemy.types import TypeDecorator, CHAR
+from typing import Any, Optional
+
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.ext.compiler import compiles
 
-if settings.DATABASE_URL.startswith("sqlite"):
-    class _UUIDCompat(TypeDecorator):
-        """Platform-independent UUID type. Stored as CHAR(36) in SQLite."""
-        impl = CHAR
-        cache_ok = True
+_PATCHED = False
 
-        def __init__(self, as_uuid=True, **kw):
-            super().__init__()
 
-        def load_dialect_impl(self, dialect):
-            if dialect.name == "postgresql":
-                return dialect.type_descriptor(PG_UUID(as_uuid=True))
-            return dialect.type_descriptor(CHAR(36))
+def patch_sqlite_types() -> None:
+    """Idempotently patch `postgresql.UUID` and `pgvector.Vector` for SQLite."""
+    global _PATCHED
+    if _PATCHED:
+        return
 
-        def process_bind_param(self, value, dialect):
+    _patch_uuid()
+    _patch_vector()
+
+    _PATCHED = True
+
+
+def _patch_uuid() -> None:
+    @compiles(PG_UUID, "sqlite")
+    def _compile_pg_uuid_sqlite(type_, compiler, **kw) -> str:  # noqa: ARG001
+        return "CHAR(36)"
+
+    _orig_bind_processor = PG_UUID.bind_processor
+    _orig_result_processor = PG_UUID.result_processor
+
+    def bind_processor(self, dialect):
+        if dialect.name != "sqlite":
+            return _orig_bind_processor(self, dialect)
+
+        def process(value: Optional[Any]):
             if value is None:
                 return value
             if isinstance(value, uuid.UUID):
                 return str(value)
-            return str(value)
+            return str(uuid.UUID(str(value)))
 
-        def process_result_value(self, value, dialect):
+        return process
+
+    def result_processor(self, dialect, coltype):
+        if dialect.name != "sqlite":
+            return _orig_result_processor(self, dialect, coltype)
+
+        def process(value: Optional[Any]):
             if value is None:
                 return value
-            if not isinstance(value, uuid.UUID):
-                return uuid.UUID(value)
-            return value
+            if isinstance(value, uuid.UUID):
+                return value
+            return uuid.UUID(str(value))
 
-    _pg.UUID = _UUIDCompat  # type: ignore[attr-defined]
-    _pg.JSONB = _JSON  # type: ignore[attr-defined]
+        return process
 
+    PG_UUID.bind_processor = bind_processor
+    PG_UUID.result_processor = result_processor
+
+
+def _patch_vector() -> None:
     try:
-        import pgvector.sqlalchemy as _pv
-        _pv.Vector = _JSON  # type: ignore[attr-defined]
+        from pgvector.sqlalchemy import Vector
     except ImportError:
-        pass
+        # pgvector isn't installed in this environment (e.g. minimal CI
+        # image) — nothing to patch, and nothing will try to use it.
+        return
 
-    logger.info("SQLite mode: patched postgresql.UUID with TypeDecorator for local development.")
+    @compiles(Vector, "sqlite")
+    def _compile_vector_sqlite(type_, compiler, **kw) -> str:  # noqa: ARG001
+        # No native vector type on SQLite; store as JSON-encoded TEXT.
+        # (Similarity search must fall back to a Python-side implementation
+        # in local dev — there's no ANN index here.)
+        return "TEXT"
 
+    _orig_bind_processor = Vector.bind_processor
+    _orig_result_processor = Vector.result_processor
+
+    def bind_processor(self, dialect):
+        if dialect.name != "sqlite":
+            return _orig_bind_processor(self, dialect)
+
+        def process(value):
+            if value is None:
+                return value
+            if hasattr(value, "tolist"):  # numpy array
+                value = value.tolist()
+            return json.dumps(list(value))
+
+        return process
+
+    def result_processor(self, dialect, coltype):
+        if dialect.name != "sqlite":
+            return _orig_result_processor(self, dialect, coltype)
+
+        def process(value):
+            if value is None:
+                return value
+            return json.loads(value)
+
+        return process
+
+    Vector.bind_processor = bind_processor
+    Vector.result_processor = result_processor

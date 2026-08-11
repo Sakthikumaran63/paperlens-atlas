@@ -7,18 +7,22 @@ from app.models.enums import RetrievalMode, SectionType
 class RetrievedChunkCandidate(BaseModel):
     chunk_id: uuid.UUID
     paper_id: uuid.UUID
-    page_number: int
-    page: int
+    page_number: int = 1
+    page: int = 1
     section_id: Optional[uuid.UUID] = None
-    section_type: SectionType
-    section_title: str
-    section: str
-    text: str
+    section_type: SectionType = SectionType.OTHER
+    section_title: str = "Document Text"
+    section: str = "Document Text"
+    text: str = ""
     semantic_score: float = 0.0
     section_score: float = 0.0
     keyword_score: float = 0.0
     final_score: float = 0.0
     similarity_score: float = 0.0
+
+    class Config:
+        from_attributes = True
+
 
     class Config:
         from_attributes = True

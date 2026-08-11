@@ -25,6 +25,25 @@ class EvidenceVerificationService:
         self.model = settings.LLM_MODEL
         self.threshold = settings.MIN_SUPPORT_SCORE_THRESHOLD
 
+    def verify_quote(self, quote_text: str, chunk_content: str, threshold: float = 90.0) -> bool:
+        """Verifies that a cited quote_text is either an exact substring of chunk_content or has partial_ratio >= threshold via rapidfuzz."""
+        if not quote_text or not chunk_content:
+            return False
+        clean_quote = quote_text.strip().lower()
+        clean_chunk = chunk_content.strip().lower()
+
+        if clean_quote in clean_chunk:
+            return True
+
+        try:
+            from rapidfuzz import fuzz
+            score = fuzz.partial_ratio(clean_quote, clean_chunk)
+            return score >= threshold
+        except ImportError:
+            # Fallback if rapidfuzz is not installed
+            return False
+
+
     def _fallback_keyword_overlap_support(self, candidate_answer: str, evidence_package: EvidencePackage) -> float:
         if not candidate_answer or not evidence_package.items:
             return 0.0
