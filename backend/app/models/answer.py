@@ -1,7 +1,7 @@
 from datetime import datetime
 import uuid
 from typing import TYPE_CHECKING, List, Optional
-from sqlalchemy import Boolean, DateTime, ForeignKey, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from app.db.types import GUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +24,13 @@ class Answer(Base):
     answer_text: Mapped[str] = mapped_column(Text, nullable=False)
     is_abstained: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     abstention_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Documented in database-design.md §2.9 — AI telemetry fields
+    support_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    provider: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    model_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    latency_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    fallback_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    fallback_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

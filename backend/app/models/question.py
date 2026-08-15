@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.answer import Answer
     from app.models.paper import Paper
     from app.models.retrieved_evidence import RetrievedEvidence
+    from app.models.user import User
     from app.models.workspace import Workspace
 
 
@@ -27,11 +28,16 @@ class Question(Base):
     paper_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         GUID, ForeignKey("papers.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    # Documented in database-design.md §2.8 — user_id FK
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
-    question_type: Mapped[QuestionType] = mapped_column(
+    # intent / intent_confidence as per database-design.md §2.8
+    intent: Mapped[QuestionType] = mapped_column(
         Enum(QuestionType, name="question_type_enum"), default=QuestionType.GENERAL, nullable=False
     )
-    confidence: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    intent_confidence: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -39,6 +45,7 @@ class Question(Base):
     # Relationships
     workspace: Mapped["Workspace"] = relationship("Workspace", back_populates="questions")
     paper: Mapped[Optional["Paper"]] = relationship("Paper")
+    user: Mapped[Optional["User"]] = relationship("User")
     retrieved_evidences: Mapped[List["RetrievedEvidence"]] = relationship(
         "RetrievedEvidence", back_populates="question", cascade="all, delete-orphan", order_by="RetrievedEvidence.rank"
     )
