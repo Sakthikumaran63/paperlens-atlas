@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { SectionCard } from "@/components/app/SectionCard";
 import { Sun, Moon, Download, Trash2, Camera, Activity, CheckCircle2, RefreshCw, Server } from "lucide-react";
 import { getSystemHealth, type SystemHealthResponse } from "@/lib/api";
+import { applyTheme, getStoredTheme, type ThemeMode } from "@/lib/theme";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -87,7 +88,7 @@ function ToggleRow({
 }
 
 function SettingsPage() {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setThemeState] = useState<ThemeMode>("light");
   const [defaultView, setDefaultView] = useState("grid");
   const [autoOpen, setAutoOpen] = useState(true);
   const [showSources, setShowSources] = useState(true);
@@ -96,6 +97,11 @@ function SettingsPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [health, setHealth] = useState<SystemHealthResponse | null>(null);
   const [healthLoading, setHealthLoading] = useState(false);
+
+  const handleSetTheme = (mode: ThemeMode) => {
+    setThemeState(mode);
+    applyTheme(mode);
+  };
 
   const fetchHealth = async () => {
     setHealthLoading(true);
@@ -110,6 +116,10 @@ function SettingsPage() {
   };
 
   useEffect(() => {
+    const currentTheme = getStoredTheme();
+    setThemeState(currentTheme);
+    applyTheme(currentTheme);
+
     fetchHealth();
     if (typeof window !== "undefined") {
       const cached = localStorage.getItem("paperlens_user");
@@ -196,7 +206,7 @@ function SettingsPage() {
                 <button
                   key={mode}
                   type="button"
-                  onClick={() => setTheme(mode)}
+                  onClick={() => handleSetTheme(mode)}
                   className={`flex items-center gap-3 rounded-md border px-4 py-3 text-left transition ${
                     active
                       ? "border-primary bg-primary/5"

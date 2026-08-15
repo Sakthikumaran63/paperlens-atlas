@@ -114,6 +114,61 @@
   --sidebar-ring: var(--terracotta);
 }
 
+.dark {
+  /* Dark mode brand tokens */
+  --ivory: oklch(0.18 0.01 70); /* Deep charcoal background #161514 */
+  --paper: oklch(0.23 0.012 70); /* Elevated card surface #201E1C */
+  --ink: oklch(0.94 0.008 85); /* High-contrast warm off-white text #F5F3EF */
+  --ink-muted: oklch(0.68 0.012 75); /* Soft silver text #A5A29A */
+  --terracotta: oklch(0.68 0.14 45); /* Rich glowing amber-terracotta #E07A5F */
+  --terracotta-soft: oklch(0.28 0.05 45); /* Dark soft terracotta accent background */
+  --rule: oklch(0.32 0.012 75); /* Border rule #3A3833 */
+  --sage: oklch(0.72 0.08 145);
+  --ochre: oklch(0.78 0.13 75);
+
+  --background: var(--ivory);
+  --foreground: var(--ink);
+  --surface: var(--paper);
+
+  --card: var(--paper);
+  --card-foreground: var(--ink);
+  --popover: var(--paper);
+  --popover-foreground: var(--ink);
+
+  --primary: var(--terracotta);
+  --primary-foreground: oklch(0.985 0.005 85);
+
+  --secondary: var(--paper);
+  --secondary-foreground: var(--ink);
+
+  --muted: oklch(0.26 0.012 75);
+  --muted-foreground: var(--ink-muted);
+
+  --accent: var(--terracotta-soft);
+  --accent-foreground: var(--terracotta);
+
+  --destructive: oklch(0.62 0.20 27);
+  --destructive-foreground: oklch(0.985 0.005 85);
+
+  --success: var(--sage);
+  --success-foreground: oklch(0.18 0.01 145);
+  --warning: var(--ochre);
+  --warning-foreground: oklch(0.18 0.01 75);
+
+  --border: var(--rule);
+  --input: var(--rule);
+  --ring: var(--terracotta);
+
+  --sidebar: var(--paper);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--terracotta);
+  --sidebar-primary-foreground: oklch(0.985 0.005 85);
+  --sidebar-accent: var(--terracotta-soft);
+  --sidebar-accent-foreground: var(--terracotta);
+  --sidebar-border: var(--rule);
+  --sidebar-ring: var(--terracotta);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);

@@ -1,5 +1,6 @@
 import { Bell, Menu } from "lucide-react";
 import { SearchInput } from "./SearchInput";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface Props {
   title: string;
@@ -33,6 +34,8 @@ export function TopBar({ title, eyebrow, onToggleSidebar }: Props) {
       <div className="hidden w-72 md:block">
         <SearchInput placeholder="Search papers, authors, notes…" />
       </div>
+
+      <ThemeToggle />
 
       <button
         type="button"

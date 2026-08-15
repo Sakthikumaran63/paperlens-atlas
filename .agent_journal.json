@@ -1,77 +1,57 @@
 {
-  "current_objective": "Semantic Scholar + CrossRef paper recommendations feature completed",
-  "last_updated": "2026-08-15T19:38:58+05:30",
+  "current_objective": "Dark & Light Mode theme management system completed",
+  "last_updated": "2026-08-15T19:53:00+05:30",
   "steps_completed": [
     {
       "step_number": 1,
-      "timestamp": "2026-08-15T18:40:00+05:30",
-      "action": "Created backend/app/services/semantic_scholar_service.py",
-      "finding": "Service fetches related papers via Semantic Scholar API with automatic CrossRef fallback for rate-limiting resilience."
+      "timestamp": "2026-08-15T19:52:19+05:30",
+      "action": "Created frontend/src/lib/theme.ts",
+      "finding": "Created getStoredTheme, applyTheme, and initTheme utility functions with localStorage persistence and system preference support."
     },
     {
       "step_number": 2,
-      "timestamp": "2026-08-15T18:41:00+05:30",
-      "action": "Updated backend/app/schemas/paper.py",
-      "finding": "Added RecommendedPaper and PaperRecommendationsResponse Pydantic schemas."
+      "timestamp": "2026-08-15T19:52:29+05:30",
+      "action": "Updated frontend/src/styles.css",
+      "finding": "Added complete .dark CSS class OKLCH color palette matching PaperLens editorial aesthetic."
     },
     {
       "step_number": 3,
-      "timestamp": "2026-08-15T18:42:00+05:30",
-      "action": "Updated backend/app/api/routes/papers.py",
-      "finding": "Added GET /papers/recommendations/search (by title) and GET /papers/{paper_id}/recommendations endpoints. Fixed route ordering so /papers/recommendations/search is before parameterized routes. Fixed SourceMetadataItem import from app.schemas.question."
+      "timestamp": "2026-08-15T19:52:34+05:30",
+      "action": "Created frontend/src/components/app/ThemeToggle.tsx",
+      "finding": "Created accessible ThemeToggle button with Sun/Moon icons for instant mode switching."
     },
     {
       "step_number": 4,
-      "timestamp": "2026-08-15T18:43:00+05:30",
-      "action": "Updated frontend/src/lib/api.ts",
-      "finding": "Added RecommendedPaper and PaperRecommendationsResponse interfaces, getPaperRecommendations and searchPaperRecommendations API functions."
+      "timestamp": "2026-08-15T19:52:43+05:30",
+      "action": "Updated frontend/src/components/app/TopBar.tsx",
+      "finding": "Added ThemeToggle to main app header bar for global access on every page."
     },
     {
       "step_number": 5,
-      "timestamp": "2026-08-15T18:44:00+05:30",
-      "action": "Updated frontend/src/routes/paper.$id.tsx",
-      "finding": "Added recommendations state, fetches recommendations in parallel during fetchPaperDetails, renders Related Research Papers SectionCard with title, authors, year, abstract, and View Paper DOI links."
+      "timestamp": "2026-08-15T19:52:56+05:30",
+      "action": "Updated frontend/src/routes/settings.tsx",
+      "finding": "Connected settings page Light/Dark mode cards to handleSetTheme(mode)."
     },
     {
       "step_number": 6,
-      "timestamp": "2026-08-15T18:46:00+05:30",
-      "action": "Fixed frontend TypeScript errors",
-      "finding": "Added actionLabel/onAction props to EmptyState.tsx, added tone prop to ConfirmDialog.tsx. tsc --noEmit passes cleanly."
+      "timestamp": "2026-08-15T19:53:17+05:30",
+      "action": "Updated frontend/src/routes/__root.tsx",
+      "finding": "Added initTheme call on root component mount to apply stored theme without flash."
     },
     {
       "step_number": 7,
-      "timestamp": "2026-08-15T18:50:00+05:30",
-      "action": "Verified API endpoint",
-      "finding": "GET /papers/recommendations/search returns 200 with 5 recommended papers via CrossRef fallback when Semantic Scholar rate-limits."
-    },
-    {
-      "step_number": 8,
-      "timestamp": "2026-08-15T19:34:00+05:30",
-      "action": "Environment & Documentation Sync",
-      "finding": "Updated backend/.env.example, created frontend/.env.example, updated .agent_code_map.md, DOCUMENTATION.md, and README.md."
-    },
-    {
-      "step_number": 9,
-      "timestamp": "2026-08-15T19:37:00+05:30",
-      "action": "Git Commit e0c2e50",
-      "finding": "Committed all 33 updated backend/frontend/docs files to git."
-    },
-    {
-      "step_number": 10,
-      "timestamp": "2026-08-15T19:38:58+05:30",
-      "action": "Created Timestamped Log File",
-      "finding": "Created .agent_log.json detailing full system architecture state, cloud database credentials, AI fallback chains, and timestamped event history."
+      "timestamp": "2026-08-15T19:53:22+05:30",
+      "action": "Verified TypeScript Compilation",
+      "finding": "npx tsc --noEmit passed cleanly with 0 errors."
     }
   ],
   "active_files": [
-    ".agent_log.json",
-    ".agent_journal.json",
-    ".agent_code_map.md",
-    "backend/app/services/semantic_scholar_service.py",
-    "backend/app/schemas/paper.py",
-    "backend/app/api/routes/papers.py",
-    "frontend/src/lib/api.ts",
-    "frontend/src/routes/paper.$id.tsx"
+    "frontend/src/lib/theme.ts",
+    "frontend/src/styles.css",
+    "frontend/src/components/app/ThemeToggle.tsx",
+    "frontend/src/components/app/TopBar.tsx",
+    "frontend/src/routes/settings.tsx",
+    "frontend/src/routes/__root.tsx"
   ],
-  "next_step": "Await user feedback or next task instruction."
+  "next_step": "Await user feedback or next instruction."
 }
