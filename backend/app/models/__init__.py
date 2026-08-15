@@ -11,6 +11,8 @@ from app.models.question import Question
 from app.models.retrieved_evidence import RetrievedEvidence
 from app.models.answer import Answer
 from app.models.answer_evidence import AnswerEvidence
+from app.models.activity_log import ActivityLog
+from app.models.ai_execution_log import AIExecutionLog
 
 __all__ = [
     "Base",
@@ -28,4 +30,6 @@ __all__ = [
     "RetrievedEvidence",
     "Answer",
     "AnswerEvidence",
+    "ActivityLog",
+    "AIExecutionLog",
 ]

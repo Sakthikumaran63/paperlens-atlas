@@ -81,19 +81,22 @@ class LLMService:
                 abstain=True
             )
 
-        # Offline fallback when no LLM API key is configured
+        # Route through unified AI router (Local primary -> Gemini fallback)
         if not settings.LLM_API_KEY:
-            logger.info("No LLM_API_KEY configured; using offline extractive Q&A fallback.")
-            from app.services.offline_ai import generate_offline_answer
-            evidence_dicts = [
-                {
-                    "text": item.text,
-                    "evidence_id": item.evidence_id,
-                }
-                for item in evidence_package.items
-            ]
-            result = generate_offline_answer(question_text, evidence_dicts)
-            return LLMAnswerOutput.model_validate(result)
+            logger.info("Using PaperLens AIRouter (Local Primary -> Policy-driven Fallback).")
+            from app.ai.router import AIRouter
+            ai_router = AIRouter()
+            gen_res = await ai_router.generate_grounded_answer(
+                question_text=question_text,
+                question_type=question_type,
+                evidence_package=evidence_package,
+            )
+            return LLMAnswerOutput(
+                answer=gen_res.answer,
+                evidence_ids=gen_res.evidence_ids,
+                confidence=gen_res.confidence,
+                abstain=gen_res.abstain,
+            )
 
         system_prompt = self._build_grounding_system_prompt(question_type)
         user_prompt = self._build_user_prompt(question_text, question_type, evidence_package)
