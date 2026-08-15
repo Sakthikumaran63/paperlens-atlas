@@ -13,6 +13,7 @@
 [![RapidFuzz](https://img.shields.io/badge/RapidFuzz-3.14+-FF6F00.svg?style=flat)](https://github.com/maxbachmann/RapidFuzz)
 [![rank--bm25](https://img.shields.io/badge/rank__bm25-0.2.2-4CAF50.svg?style=flat)](https://github.com/dorianbrown/rank_bm25)
 [![Slowapi](https://img.shields.io/badge/Slowapi-Rate_Limiting-blueviolet.svg?style=flat)](https://slowapi.readthedocs.io/)
+[![Docker Compose](https://img.shields.io/badge/Docker_Compose-Ready-2496ED.svg?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 
 > **Understand research papers. Ask questions. Follow the evidence.**
 
@@ -23,38 +24,43 @@
 - [1. Executive Overview](#1-executive-overview)
   - [The Problem with Generic RAG on Scientific Literature](#the-problem-with-generic-rag-on-scientific-literature)
   - [The PaperLens Solution](#the-paperlens-solution)
-- [2. System Architecture & End-to-End Pipeline](#2-system-architecture--end-to-end-pipeline)
+- [2. System Architecture & Modular Subsystems](#2-system-architecture--modular-subsystems)
   - [Architectural Topology](#architectural-topology)
+  - [Modular Domain Subpackages](#modular-domain-subpackages)
   - [Scientific Ingestion Pipeline](#scientific-ingestion-pipeline)
   - [Structure-Aware Grounded Q&A Pipeline](#structure-aware-grounded-qa-pipeline)
-- [3. Core Technical Innovations & RAG Mechanics](#3-core-technical-innovations--rag-mechanics)
+- [3. AI Engine & Fallback Architecture](#3-ai-engine--fallback-architecture)
+  - [Local-First AI Engine (Primary)](#local-first-ai-engine-primary)
+  - [Confidence-Aware Gemini Fallback (Secondary)](#confidence-aware-gemini-fallback-secondary)
+  - [Authoritative Database Provenance Principle](#authoritative-database-provenance-principle)
+- [4. Core Technical Innovations & RAG Mechanics](#4-core-technical-innovations--rag-mechanics)
   - [Structure-Aware Chunking & Section Taxonomy](#structure-aware-chunking--section-taxonomy)
   - [Question Intent Routing (14 Taxonomies)](#question-intent-routing-14-taxonomies)
   - [Hybrid Retrieval Scoring (BM25 + Semantic + Section Boost)](#hybrid-retrieval-scoring-bm25--semantic--section-boost)
   - [Citation Provenance & RapidFuzz Quote Verification](#citation-provenance--rapidfuzz-quote-verification)
   - [Controlled Uncertainty & Safe Abstention](#controlled-uncertainty--safe-abstention)
-  - [Zero-Dependency Offline Extractive AI Engine](#zero-dependency-offline-extractive-ai-engine)
-- [4. Security, Isolation & Durability Hardening](#4-security-isolation--durability-hardening)
+- [5. Security, Isolation & Durability Hardening](#5-security-isolation--durability-hardening)
   - [Cookie-Based Authentication & Session Hydration](#cookie-based-authentication--session-hydration)
-  - [Systematic Anti-IDOR Workspace Isolation](#systematic-anti-idor-workspace-isolation)
+  - [Systematic Anti-IDOR Workspace Isolation (404 Not Found)](#systematic-anti-idor-workspace-isolation-404-not-found)
   - [PDF Prompt Injection Defense](#pdf-prompt-injection-defense)
   - [Sliding-Window Rate Limiting (Slowapi)](#sliding-window-rate-limiting-slowapi)
   - [Pipeline Durability & Automatic Reconciler](#pipeline-durability--automatic-reconciler)
-- [5. Database Entity Relational Architecture](#5-database-entity-relational-architecture)
-- [6. Base Research Papers & Verified Evaluation](#6-base-research-papers--verified-evaluation)
+- [6. Database Architecture (16 Relational Models)](#6-database-architecture-16-relational-models)
 - [7. Benchmark Framework (QASPER 3-Way RAG Comparison)](#7-benchmark-framework-qasper-3-way-rag-comparison)
-- [8. Complete REST API Reference](#8-complete-rest-api-reference)
-- [9. Frontend Application Feature Tour](#9-frontend-application-feature-tour)
-- [10. Repository File Structure](#10-repository-file-structure)
-- [11. Quick Start & Local Setup](#11-quick-start--local-setup)
+- [8. Base Research Papers & Verified Evaluation](#8-base-research-papers--verified-evaluation)
+- [9. Complete REST API Reference](#9-complete-rest-api-reference)
+- [10. Frontend Application Feature Tour](#10-frontend-application-feature-tour)
+- [11. Repository File Structure](#11-repository-file-structure)
+- [12. Quick Start & Local Setup](#12-quick-start--local-setup)
   - [Prerequisites](#prerequisites)
   - [1-Click Offline Launcher (PowerShell)](#1-click-offline-launcher-powershell)
+  - [Docker Compose Multi-Container Setup](#docker-compose-multi-container-setup)
   - [Manual Backend Installation](#manual-backend-installation)
   - [Manual Frontend Installation](#manual-frontend-installation)
-  - [Environment Variables (.env) Reference](#environment-variables-env-reference)
+  - [Environment Variables Configuration](#environment-variables-configuration)
   - [Running Test Suites](#running-test-suites)
-- [12. Complete Documentation Sitemap](#12-complete-documentation-sitemap)
-- [13. License](#13-license)
+- [13. Technical Documentation Sitemap](#13-technical-documentation-sitemap)
+- [14. License](#14-license)
 
 ---
 
@@ -82,11 +88,11 @@ $$\textbf{An answer is only as useful as the evidence supporting it.}$$
 - **RapidFuzz Quote Verification**: Every cited quote is checked against source text using exact substring matching and `RapidFuzz` ($S_{\text{match}} \ge 90$). Fabricated quotes are dropped before database persistence.
 - **Explicit Abstention Guard**: If the computed support score falls below threshold ($S_{\text{support}} < 0.70$) or if no verifiable citations survive, PaperLens safely refuses:
   > *"I couldn't find enough information in the uploaded paper to answer this reliably."*
-- **Offline Mode as a First-Class Citizen**: Functions completely locally without external API keys or paid third-party dependencies.
+- **Local-First with Confidence-Aware Gemini Fallback**: Uses local offline AI for primary generation and invokes Google Gemini only when local confidence or completeness falls below threshold.
 
 ---
 
-## 2. System Architecture & End-to-End Pipeline
+## 2. System Architecture & Modular Subsystems
 
 ### Architectural Topology
 
@@ -103,78 +109,80 @@ $$\textbf{An answer is only as useful as the evidence supporting it.}$$
                                │   (Slowapi Limiter + Auth + Deps)      │
                                └───────────────────┬────────────────────┘
                                                    │
-       ┌───────────────────────────────────────────┼────────────────────────────────────────────┐
-       ▼                                           ▼                                            ▼
-┌──────────────┐                         ┌───────────────────┐                        ┌────────────────────┐
-│ PyMuPDF PDF  │                         │ Pipeline Engine   │                        │ Grounded Q&A RAG   │
-│ Extractor    │                         │ (Async Pipeline)  │                        │ Engine             │
-└──────────────┘                         └─────────┬─────────┘                        └─────────┬──────────┘
-                                                   │                                            │
-                                                   ▼                                            ▼
-                                         ┌───────────────────┐                        ┌────────────────────┐
-                                         │ Section Detector  │                        │ Question Classifier│
-                                         │ & Chunking Engine │                        │ (14 Taxonomies)    │
-                                         └─────────┬─────────┘                        └─────────┬──────────┘
-                                                   │                                            │
-                                                   ▼                                            ▼
-                                         ┌───────────────────┐                        ┌────────────────────┐
-                                         │ Embedding Service │                        │ Hybrid Retrieval   │
-                                         │ (OpenAI / Offline)│                        │ (Dense + BM25Okapi)│
-                                         └─────────┬─────────┘                        └─────────┬──────────┘
-                                                   │                                            │
-                                                   ▼                                            ▼
-                                         ┌───────────────────┐                        ┌────────────────────┐
-                                         │ 10-Field Summary  │                        │ RapidFuzz Verifier │
-                                         │ & Method Extractor│                        │ & Abstention Guard │
-                                         └───────────────────┘                        └────────────────────┘
+       ┌───────────────────┬───────────────────────┼───────────────────────┬───────────────────┐
+       ▼                   ▼                       ▼                       ▼                   ▼
+┌──────────────┐  ┌──────────────────┐   ┌───────────────────┐   ┌───────────────────┐  ┌─────────────┐
+│ app/document │  │ app/retrieval    │   │ app/ai (Router)   │   │ app/evidence      │  │ app/jobs    │
+│  - Extractor │  │  - DenseRetriever│   │  - LocalProvider  │   │  - Selector       │  │  - Queue    │
+│  - SectionDet│  │  - BM25Retriever │   │  - GeminiProvider │   │  - Verifier       │  │  - Worker   │
+│  - Chunker   │  │  - SectionRouter │   │  - FallbackPolicy │   │  - SupportEval    │  │  - Reconcile│
+│  - Sanitizer │  │  - HybridScorer  │   │  - PromptSafety   │   │  - CitationAssm   │  │  - Tasks    │
+└──────────────┘  └──────────────────┘   └───────────────────┘   └───────────────────┘  └─────────────┘
 ```
 
-### Scientific Ingestion Pipeline
+### Modular Domain Subpackages
 
-When a scientific PDF is uploaded (`POST /api/v1/papers/upload`), the backend initiates an asynchronous multi-stage ingestion worker:
+The backend (`backend/app/`) is architected into clean, typed, modular domain subpackages:
 
-```text
-[UPLOADED 0%] ──► [EXTRACTING 20%] ──► [STRUCTURING 40%] ──► [CHUNKING 60%] ──► [EMBEDDING 80%] ──► [ANALYZING 95%] ──► [READY 100%]
-```
+1. **`app/retrieval/`**: `DenseRetriever`, `BM25Retriever`, `SectionRouter`, `HybridScorer`, `IdentityReranker`, `HybridRetriever`.
+2. **`app/document/`**: `DocumentExtractor` (PyMuPDF), `DocumentSectionDetector` (12-class taxonomy), `DocumentChunker` (~400 tokens), `DocumentSanitizer` (XML safety wrappers).
+3. **`app/evidence/`**: `EvidenceSelector` (token budget allocator), `CitationVerifier` (RapidFuzz $S \ge 90$), `SupportEvaluator` ($S \ge 0.70$), `CitationAssembler`.
+4. **`app/ai/`**: `LocalModelProvider`, `GeminiProvider`, `FallbackPolicy`, `AIRouter`.
+5. **`app/jobs/`**: `AsyncJobQueue`, `PipelineWorker`, `tasks.py`, `reconciler.py`.
+6. **`app/storage/`**: `StorageManager` (safe UUID storage), `FileHasher` (SHA-256 deduplication).
+7. **`app/observability/`**: `AuditLogger` (`activity_logs`), `PerformanceMetrics`, `tracing.py`.
 
-1. **Extraction (`PDFExtractor`)**: PyMuPDF extracts raw text, page geometries, font metadata, and titles while preserving strict page boundaries.
-2. **Structuring (`SectionDetector`)**: Rule-based regex & lexical heuristics classify headings into a 12-type scientific taxonomy.
-3. **Chunking (`ChunkingEngine`)**: Generates ~400-token semantic chunks that strictly honor section and page boundaries without cross-boundary bleeding.
-4. **Embedding (`EmbeddingService` / `IndexingService`)**: Computes 1536-dimensional vectors (OpenAI `text-embedding-3-small` or deterministic offline hashing) stored in `PaperChunk.embedding`.
-5. **Analysis (`SummaryService`)**: Extracts 10-field executive summary, 8-part methodology breakdown, and explicit vs. inferred contribution claims.
+---
 
-### Structure-Aware Grounded Q&A Pipeline
+## 3. AI Engine & Fallback Architecture
+
+PaperLens Atlas implements a **local-first, confidence-aware dual-engine AI architecture**:
 
 ```text
 User Question
       │
       ▼
-1. Question Classification (Intent: DATASET, METHODOLOGY, RESULT, etc.)
+Evidence Retrieval & Verification
       │
       ▼
-2. Candidate Retrieval: Dense Vector Cosine Similarity + BM25Okapi Keyword Ranking
-      │
-      ▼
-3. Structure-Aware Scoring: Composite weighting boosted by section alignment
-      │
-      ▼
-4. Evidence Selection & Budget Context Assembly (<UNTRUSTED_DOCUMENT_CONTENT>)
-      │
-      ▼
-5. Grounded LLM Generation (or Offline Extractive Model)
-      │
-      ▼
-6. Citation Verification: Exact substring + RapidFuzz (Score >= 90)
-      │
-      ▼
-7. Support Score Evaluation (Threshold S >= 0.70)
-     ├── Passed ──► Answer + DB-Bound Source Provenance (Page, Section, Text)
-     └── Failed ──► Controlled Refusal (Abstention)
+┌──────────────────────────────────────┐
+│       Primary AI: Local Model        │
+│  (Deterministic Extractive Engine)   │
+└──────────────────┬───────────────────┘
+                   │
+                   ▼
+      Evaluate Confidence & Coverage
+      ├── Sufficient (Conf >= 0.50) ──► Verified Answer
+      └── Insufficient / Low Coverage
+                   │
+                   ▼
+      ┌──────────────────────────────┐
+      │   Fallback AI: Google Gemini │
+      │   (Strict Evidence Sandbox)  │
+      └────────────┬─────────────────┘
+                   │
+                   ▼
+            Verified Answer
 ```
+
+### Local-First AI Engine (Primary)
+- Operates locally with zero external API dependencies.
+- Generates extracted, grounded summaries and answers directly from candidate chunks.
+- Computes intrinsic confidence scores and token overlap metrics.
+
+### Confidence-Aware Gemini Fallback (Secondary)
+- Invoked **only** when `FallbackPolicy` detects:
+  - `confidence < 0.50`
+  - `LOW_EVIDENCE_COVERAGE`
+  - `LOCAL_MODEL_UNAVAILABLE`
+- Receives strictly bounded `<UNTRUSTED_DOCUMENT_CONTENT>` XML containers and is prevented from hallucinating citations.
+
+### Authoritative Database Provenance Principle
+The AI model (whether Local or Gemini) is **never** authoritative for page numbers, section headers, or chunk IDs. Provenance is attached strictly by the database retrieval layer.
 
 ---
 
-## 3. Core Technical Innovations & RAG Mechanics
+## 4. Core Technical Innovations & RAG Mechanics
 
 ### Structure-Aware Chunking & Section Taxonomy
 
@@ -216,7 +224,7 @@ Where:
 
 To eradicate citation hallucinations:
 1. Every answer evidence reference must quote exact text from an underlying `PaperChunk`.
-2. The verification engine (`EvidenceVerificationService.verify_quote`) evaluates candidate citations:
+2. The verification engine (`CitationVerifier.verify_quote`) evaluates candidate citations:
    - **Exact Match**: Is the quote a direct substring of the chunk?
    - **Fuzzy Match**: If not exact, does `rapidfuzz.fuzz.partial_ratio(quote, chunk_text) \ge 90.0`?
 3. Any cited quote failing this check is stripped before persisting `AnswerEvidence` database records.
@@ -225,20 +233,13 @@ To eradicate citation hallucinations:
 ### Controlled Uncertainty & Safe Abstention
 
 When a user asks a question that cannot be proven by the uploaded text:
-- `EvidenceVerificationService.evaluate_support()` computes a semantic and lexical overlap metric $S_{\text{support}} \in [0, 1]$.
+- `SupportEvaluator.evaluate_support()` computes a semantic and lexical overlap metric $S_{\text{support}} \in [0, 1]$.
 - If $S_{\text{support}} < 0.70$, the pipeline sets `abstained = true` and returns the standardized refusal:
   > *"I couldn't find enough information in the uploaded paper to answer this reliably."*
 
-### Zero-Dependency Offline Extractive AI Engine
-
-PaperLens operates locally without external API keys via [app/services/offline_ai.py](file:///d:/sakthi/paperlens-atlas/backend/app/services/offline_ai.py):
-- **Deterministic 1536-D Pseudo-Embeddings**: Generated via SHA-256 seed hashing of token n-grams and normalized using L2 unit vectors.
-- **Rule-Based Summary & Methodology Extraction**: Heuristic regex matchers extract key objectives, dataset names, formulas, and quantitative findings directly from section text.
-- **Extractive Grounded Q&A**: BM25 and keyword frequency ranking identify the top candidate sentences from relevant sections to construct grounded, citation-bound answers.
-
 ---
 
-## 4. Security, Isolation & Durability Hardening
+## 5. Security, Isolation & Durability Hardening
 
 ### Cookie-Based Authentication & Session Hydration
 - JWT tokens are issued and stored in secure `httpOnly`, `SameSite=Lax` cookies (`paperlens_token`), preventing client-side script access and neutralizing XSS token exfiltration.
@@ -246,7 +247,7 @@ PaperLens operates locally without external API keys via [app/services/offline_a
 - Added `POST /api/v1/auth/logout` to terminate sessions and clear cookies.
 - Frontend hydrates user profile on application startup via `GET /api/v1/auth/me`.
 
-### Systematic Anti-IDOR Workspace Isolation
+### Systematic Anti-IDOR Workspace Isolation (404 Not Found)
 - All paper, chunk, analysis, and Q&A operations enforce query-level tenancy via `get_workspace_scoped_paper`:
   ```python
   stmt = (
@@ -273,9 +274,9 @@ PaperLens operates locally without external API keys via [app/services/offline_a
 
 ---
 
-## 5. Database Entity Relational Architecture
+## 6. Database Architecture (16 Relational Models)
 
-PaperLens employs 11 relational models with strict foreign key constraints and cascade deletion:
+PaperLens employs 16 normalized relational models with strict foreign key constraints, indexes, and cascade deletion:
 
 ```mermaid
 erDiagram
@@ -291,63 +292,49 @@ erDiagram
     ANSWER ||--o{ ANSWER_EVIDENCE : binds
     PAPER_CHUNK ||--o{ ANSWER_EVIDENCE : references
     PAPER_CHUNK ||--o{ RETRIEVED_EVIDENCE : references
-
-    USER {
-        uuid id PK
-        string email UK
-        string hashed_password
-        string name
-        boolean is_active
-        boolean is_admin
-        datetime created_at
-    }
-    WORKSPACE {
-        uuid id PK
-        uuid user_id FK
-        string name
-        string slug
-    }
-    PAPER {
-        uuid id PK
-        uuid workspace_id FK
-        string title
-        string authors
-        integer page_count
-        string status
-        string stage
-        integer progress
-        string file_path
-    }
-    PAPER_CHUNK {
-        uuid id PK
-        uuid paper_id FK
-        uuid section_id FK
-        integer page_number
-        text content
-        vector_1536 embedding
-        integer token_count
-    }
-    ANSWER {
-        uuid id PK
-        uuid question_id FK
-        text answer_text
-        boolean abstained
-        float support_score
-    }
-    ANSWER_EVIDENCE {
-        uuid id PK
-        uuid answer_id FK
-        uuid chunk_id FK
-        text quote_text
-        float confidence_score
-    }
+    EXPERIMENT ||--o{ EXPERIMENT_RUN : executes
+    QUESTION ||--o{ AI_EXECUTION_LOG : traces
 ```
+
+### Complete Entity Specification
+1. **`users`** — Accounts, passlib bcrypt password hashes, OAuth providers, admin flags.
+2. **`workspaces`** — Tenant-isolated research workspaces per user.
+3. **`papers`** — Document metadata (`doi`, `source_url`, `file_hash`, `error_code`, `status`, `stage`, `completed_at`).
+4. **`paper_pages`** — Page-level text extraction with `UNIQUE(paper_id, page_number)` constraint.
+5. **`paper_sections`** — 12-class scientific taxonomy classification and sequence bounds.
+6. **`paper_chunks`** — Semantic chunks with `page_id` FK, `char_start`, `char_end`, `embedding_model`, and `pgvector(1536)`.
+7. **`paper_analyses`** — Executive summaries, 8-part methodology, explicit/inferred contributions.
+8. **`questions`** — User questions, `user_id` FK, 14-taxonomy `intent`, and `intent_confidence`.
+9. **`answers`** — Grounded text, `support_score`, `confidence_score`, `provider`, `model_name`, `model_version`, `latency_ms`, `fallback_used`, `fallback_reason`.
+10. **`retrieved_evidences`** — Retrieval scores (`semantic_score`, `bm25_score`, `section_score`, `reranker_score`, `final_score`, `retrieval_strategy`).
+11. **`answer_evidences`** — Binding records with `quote_text`, `quote_start`, `quote_end`, `verification_method`, `verification_score`, `support_score`.
+12. **`activity_logs`** — Audit trail of workspace lifecycle events.
+13. **`ai_execution_logs`** — Fine-grained AI inference telemetry without secret leakage.
+14. **`ai_models`** — AI Model Registry tracking available providers (`LOCAL`, `GEMINI`), versions, and active state.
+15. **`experiments`** — Benchmark evaluation experiment configurations.
+16. **`experiment_runs`** — Benchmark evaluation run tracking across baseline, structure-aware, and verification RAG.
 
 ---
 
-## 6. Base Research Papers & Verified Evaluation
+## 7. Benchmark Framework (QASPER 3-Way RAG Comparison)
 
-PaperLens has been tested against 6 full-length peer-reviewed scientific papers located in [backend/Data/base paper/](file:///d:/sakthi/paperlens-atlas/backend/Data/base%20paper):
+PaperLens includes a native 3-way evaluation harness comparing retrieval and generation architectures:
+
+1. **`BASELINE_RAG`**: Standard fixed-character sliding window chunking + pure vector cosine similarity.
+2. **`STRUCTURE_AWARE_RAG`**: Section taxonomy routing + BM25 Okapi hybrid scoring.
+3. **`STRUCTURE_AWARE_RAG_WITH_VERIFICATION`**: Structure-aware retrieval + RapidFuzz citation verification + support score abstention guard.
+
+### Evaluation Metrics Computed
+- **Recall@K & Precision@K**: Fraction of ground-truth evidence chunks retrieved in the top $K$ results.
+- **Mean Reciprocal Rank (MRR)**: Average reciprocal rank of the first relevant evidence chunk.
+- **Grounding Accuracy**: Percentage of answer claims directly supported by verified citations.
+- **Abstention Accuracy**: Precision and recall of the system on unanswerable test queries.
+
+---
+
+## 8. Base Research Papers & Verified Evaluation
+
+PaperLens has been tested against 6 full-length peer-reviewed scientific papers located in `backend/Data/base paper/`:
 
 | # | Paper Title / File | Domain | Key Topics Tested | Q&A Pass Rate |
 |---|---|---|---|---|
@@ -362,56 +349,36 @@ All 6 papers successfully completed the full 5-stage ingestion pipeline and pass
 
 ---
 
-## 7. Benchmark Framework (QASPER 3-Way RAG Comparison)
-
-PaperLens includes a native 3-way evaluation harness comparing retrieval and generation architectures:
-
-1. **`BASELINE_RAG`**: Standard fixed-character sliding window chunking + pure vector cosine similarity.
-2. **`STRUCTURE_AWARE_RAG`**: Section taxonomy routing + BM25 Okapi hybrid scoring.
-3. **`STRUCTURE_AWARE_RAG_WITH_VERIFICATION`**: Structure-aware retrieval + RapidFuzz citation verification + support score abstention guard.
-
-### Evaluation Metrics Computed
-
-- **Recall@K & Precision@K**: Fraction of ground-truth evidence chunks retrieved in the top $K$ results.
-- **Mean Reciprocal Rank (MRR)**: Average reciprocal rank of the first relevant evidence chunk.
-- **Grounding Accuracy**: Percentage of answer claims directly supported by verified citations.
-- **Abstention Accuracy**: Precision and recall of the system on unanswerable test queries.
-
-### QASPER Dataset Ingestion CLI
-
-```bash
-cd backend
-python scripts/ingest_qasper_benchmark.py --limit 100 --split dev
-```
-
----
-
-## 8. Complete REST API Reference
+## 9. Complete REST API Reference
 
 Base URL: `http://localhost:8000/api/v1`
 
-| Method | Endpoint | Description | Rate Limit |
-|---|---|---|---|
-| `POST` | `/auth/register` | Register new user & workspace | 10 / min |
-| `POST` | `/auth/login` | Authenticate & set httpOnly cookie | 20 / min |
-| `POST` | `/auth/logout` | Clear session & authentication cookie | — |
-| `GET` | `/auth/me` | Hydrate authenticated user profile | — |
-| `POST` | `/papers/upload` | Upload PDF & start ingestion pipeline | — |
-| `GET` | `/papers` | List papers in workspace | — |
-| `GET` | `/papers/{id}` | Get paper metadata, pages & sections | — |
-| `DELETE`| `/papers/{id}` | Delete paper & cascade delete chunks | — |
-| `GET` | `/papers/{id}/status` | Poll pipeline stage & progress percentage | — |
-| `POST` | `/papers/{id}/retry` | Re-trigger failed pipeline worker | — |
-| `POST` | `/papers/{id}/questions` | **Main Grounded Q&A** (BM25 + RapidFuzz) | 30 / min |
-| `GET` | `/papers/{id}/analysis` | Get 10-field structured summary | — |
-| `GET` | `/papers/{id}/methodology`| Get 8-part structured methodology | — |
-| `GET` | `/papers/{id}/contributions`| Get explicit vs inferred contributions | — |
-| `POST` | `/papers/{id}/evaluate` | Run 3-way RAG benchmark evaluation | — |
-| `GET` | `/health` | Multi-subsystem health check | — |
+| Method | Endpoint | Description | Auth Required | Rate Limit |
+|---|---|---|---|---|
+| `POST` | `/auth/register` | Register new user & workspace | Public | 10 / min |
+| `POST` | `/auth/login` | Authenticate & set httpOnly cookie | Public | 20 / min |
+| `POST` | `/auth/oauth` | OAuth Google / Microsoft login | Public | — |
+| `POST` | `/auth/logout` | Clear session & authentication cookie | Cookie / Bearer | — |
+| `GET` | `/auth/me` | Hydrate authenticated user profile | Cookie / Bearer | — |
+| `POST` | `/papers/upload` | Upload PDF & start ingestion pipeline | Scoped Tenant | 20 / min |
+| `GET` | `/papers` | List papers in workspace | Scoped Tenant | — |
+| `GET` | `/papers/{id}` | Get paper metadata, pages & sections | Anti-IDOR (404) | — |
+| `DELETE`| `/papers/{id}` | Delete paper & cascade delete chunks | Anti-IDOR (404) | — |
+| `GET` | `/papers/{id}/status` | Poll pipeline stage & progress | Anti-IDOR (404) | — |
+| `POST` | `/papers/{id}/retry` | Re-trigger failed pipeline worker | Anti-IDOR (404) | — |
+| `POST` | `/papers/{id}/questions` | **Main Grounded Q&A** (BM25 + RapidFuzz) | Anti-IDOR (404) | 30 / min |
+| `GET` | `/papers/{id}/analysis` | Get 10-field structured summary | Anti-IDOR (404) | — |
+| `GET` | `/papers/{id}/methodology`| Get 8-part structured methodology | Anti-IDOR (404) | — |
+| `GET` | `/papers/{id}/contributions`| Get explicit vs inferred contributions | Anti-IDOR (404) | — |
+| `POST` | `/papers/{id}/evaluate` | Run 3-way RAG benchmark evaluation | Anti-IDOR (404) | — |
+| `GET` | `/admin/stats` | System aggregate statistics | Admin Only | — |
+| `GET` | `/admin/users` | List registered platform users | Admin Only | — |
+| `DELETE`| `/admin/users/{id}` | Delete platform user account | Admin Only | — |
+| `GET` | `/health` | Multi-subsystem health check | Public | — |
 
 ---
 
-## 9. Frontend Application Feature Tour
+## 10. Frontend Application Feature Tour
 
 Built with React 19, TanStack Router, Tailwind CSS v4, and Lucide Icons:
 
@@ -429,12 +396,13 @@ Built with React 19, TanStack Router, Tailwind CSS v4, and Lucide Icons:
 
 ---
 
-## 10. Repository File Structure
+## 11. Repository File Structure
 
 ```text
 paperlens-atlas/
 ├── backend/
 │   ├── app/
+│   │   ├── ai/                     # LocalModelProvider, GeminiProvider, FallbackPolicy, AIRouter
 │   │   ├── api/
 │   │   │   ├── routes/             # auth.py, papers.py, questions.py, health.py, admin.py
 │   │   │   ├── deps.py             # Auth & anti-IDOR get_workspace_scoped_paper dependencies
@@ -449,35 +417,22 @@ paperlens-atlas/
 │   │   │   ├── session.py          # Async engine & sessionmaker
 │   │   │   ├── sqlite_shim.py      # SQLite vector & UUID compatibility shim
 │   │   │   └── types.py            # Custom DB types (GUID, Vector fallback)
-│   │   ├── models/                 # User, Workspace, Paper, Page, Section, Chunk, Answer, etc.
+│   │   ├── document/               # Extractor, SectionDetector, Chunker, Sanitizer
+│   │   ├── evidence/               # Selector, Verifier, SupportEvaluator, CitationAssembler
+│   │   ├── jobs/                   # AsyncJobQueue, PipelineWorker, tasks.py, reconciler.py
+│   │   ├── models/                 # 16 SQLAlchemy models (User, Paper, Chunk, Answer, AIModel, Experiment)
+│   │   ├── observability/          # AuditLogger, PerformanceMetrics, tracing.py
+│   │   ├── retrieval/              # DenseRetriever, BM25Retriever, SectionRouter, HybridScorer
 │   │   ├── schemas/                # Pydantic request/response validation schemas
-│   │   ├── services/
-│   │   │   ├── answer_generation_service.py    # Grounded Q&A generation & citation assembly
-│   │   │   ├── contribution_extraction_service.py # Explicit vs inferred contribution mining
-│   │   │   ├── embedding_service.py            # Dense vector embeddings
-│   │   │   ├── evaluation_service.py           # 3-way RAG evaluation harness
-│   │   │   ├── evidence_selection_service.py   # Context budget assembly & deduplication
-│   │   │   ├── evidence_verification_service.py# RapidFuzz & support score verification
-│   │   │   ├── indexing_service.py             # Vector storage & indexing
-│   │   │   ├── llm_service.py                  # Prompt templates & safety wrappers
-│   │   │   ├── methodology_extraction_service.py # 8-part methodology extractor
-│   │   │   ├── offline_ai.py                   # Zero-dependency offline extractive AI engine
-│   │   │   ├── paper_processing_service.py     # High-level paper processing orchestrator
-│   │   │   ├── pdf_extractor.py                # PyMuPDF text & metadata extraction
-│   │   │   ├── pipeline_orchestrator.py        # 5-stage async pipeline orchestrator
-│   │   │   ├── pipeline_reconciler.py          # Stalled paper background reconciler
-│   │   │   ├── question_classifier.py          # 14-taxonomy question intent classifier
-│   │   │   ├── retrieval_service.py            # pgvector cosine similarity search
-│   │   │   ├── retrieval_strategy_service.py   # Structure-aware BM25Okapi hybrid retrieval
-│   │   │   ├── section_detector.py             # 12-taxonomy section detector
-│   │   │   └── summary_service.py              # 10-field structured summary extractor
-│   │   ├── utils/
-│   │   │   └── storage.py          # UUID file persistence & MIME validation
+│   │   ├── services/               # Pipeline orchestrators, extraction services, indexing
+│   │   ├── storage/                # StorageManager, FileHasher
 │   │   └── main.py                 # FastAPI application factory, CORS, lifespan & exceptions
 │   ├── Data/base paper/            # 6 reference research papers for evaluation
 │   ├── scripts/                    # CLI evaluation & benchmark ingestion scripts
 │   ├── tests/                      # 23 pytest test modules
-│   └── requirements.txt            # Python dependencies
+│   ├── Dockerfile                  # Production container definition
+│   ├── requirements.txt            # Python dependencies
+│   └── .env.example                # Configuration template
 ├── frontend/
 │   ├── src/
 │   │   ├── components/app/         # Sidebar, Header, AuthModal, UploadModal, CitationCard, etc.
@@ -489,21 +444,40 @@ paperlens-atlas/
 │   │   └── index.css               # Design tokens & typography
 │   └── package.json                # Frontend dependencies & scripts
 ├── docs/                           # Complete technical specification suite
+│   ├── backend/                    # Backend architecture, ADRs, database design, contracts
+│   │   ├── ADR-001-backend-architecture.md
+│   │   ├── database-design.md
+│   │   ├── frontend-contract-matrix.md
+│   │   ├── security-review.md
+│   │   ├── IMPLEMENTATION_STATUS.md
+│   │   └── final-audit/            # Audit reports & coverage matrices
+├── docker-compose.yml              # Multi-container PostgreSQL 16 + pgvector & FastAPI compose
 ├── scratch/                        # Automated test & verification scripts
-├── run_offline.ps1                 # 1-Click offline application runner (PowerShell)
-├── DOCUMENTATION.md                # Exhaustive master technical documentation
 └── README.md                       # Public project overview & quick start
 ```
 
 ---
 
-## 11. Quick Start & Local Setup
+## 12. Quick Start & Local Setup
 
 ### Prerequisites
-
 - **Python**: 3.11 or higher
 - **Node.js**: 18 or higher (with npm)
-- **Database**: SQLite (default local mode) or PostgreSQL 15+ with `pgvector` extension
+- **Database**: SQLite (default local development) or PostgreSQL 16 with `pgvector`
+
+---
+
+### Docker Compose Multi-Container Setup
+
+To launch the full stack with PostgreSQL 16 and `pgvector`:
+
+```bash
+docker-compose up --build
+```
+- **Backend API**: `http://localhost:8000`
+- **Swagger Docs**: `http://localhost:8000/docs`
+
+---
 
 ### 1-Click Offline Launcher (PowerShell)
 
@@ -536,7 +510,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # 4. Start the FastAPI development server
-python -m uvicorn app.main:app --reload --port 8000 --host 0.0.0.0
+python -m uvicorn app.main:app --reload --port 8000 --host 127.0.0.1
 ```
 
 ---
@@ -556,34 +530,26 @@ npm run dev
 
 ---
 
-### Environment Variables (`.env`) Reference
+### Environment Variables Configuration
 
-Create a `.env` file in the `backend/` directory to customize configurations:
+Copy `backend/.env.example` to `backend/.env` to configure settings:
 
 ```env
-# Application Settings
-ENVIRONMENT=development
 PROJECT_NAME=paperlens-backend
-API_V1_STR=/api/v1
-SECRET_KEY=your-super-secret-jwt-signing-key-here-32-chars-min
+ENV=development
+DATABASE_URL=sqlite+aiosqlite:///./paperlens_v2.db
+SECRET_KEY=your-super-secret-key-32-chars-min
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
+CORS_ORIGINS=["http://localhost:5173","http://localhost:3000"]
 
-# Database Configuration (SQLite default / PostgreSQL optional)
-DATABASE_URL=sqlite+aiosqlite:///./paperlens_local.db
-# For PostgreSQL with pgvector:
-# DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/paperlens
+# Hybrid Retrieval Weights
+RETRIEVAL_SEMANTIC_WEIGHT=0.60
+RETRIEVAL_SECTION_WEIGHT=0.25
+RETRIEVAL_KEYWORD_WEIGHT=0.15
 
-# AI & LLM Services (Optional — Offline fallback active if omitted)
-LLM_PROVIDER=openai
-LLM_API_KEY=sk-...
-LLM_MODEL=gpt-4o-mini
-EMBEDDING_PROVIDER=openai
-EMBEDDING_API_KEY=sk-...
-EMBEDDING_MODEL=text-embedding-3-small
-
-# Storage Limits
-MAX_UPLOAD_SIZE_BYTES=20971520
-UPLOAD_DIR=storage/uploads
+# Verification & Abstention Thresholds
+QUOTE_MATCH_THRESHOLD=90
+MIN_SUPPORT_SCORE_THRESHOLD=0.70
 ```
 
 ---
@@ -591,37 +557,33 @@ UPLOAD_DIR=storage/uploads
 ### Running Test Suites
 
 ```bash
-# 1. Run Unit & Service Tests (PyTest)
-cd backend
-pytest
-
-# 2. Run Architectural Improvements Verification Suite (Cookie Auth, Anti-IDOR, RapidFuzz, BM25, Limiter, Reconciler)
+# 1. Run Architectural Improvements Verification Suite (Cookie Auth, Anti-IDOR, RapidFuzz, BM25, Limiter, Reconciler)
 python scratch/test_improvements.py
 
-# 3. Run End-to-End Base Papers Pipeline Test across all 6 research papers
+# 2. Run End-to-End Base Papers Pipeline Test across all 6 research papers
 python scratch/test_full_pipeline.py
+
+# 3. Run Pytest unit & integration test suites
+cd backend
+pytest
 ```
 
 ---
 
-## 12. Complete Documentation Sitemap
+## 13. Technical Documentation Sitemap
 
 | Document | Purpose |
 |---|---|
-| **[DOCUMENTATION.md](DOCUMENTATION.md)** | Comprehensive master technical specification, database models, RAG engine, and API reference |
-| **[docs/PRODUCT_SPEC.md](docs/PRODUCT_SPEC.md)** | Product identity, target users, features, workflow, and scope boundaries |
-| **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Monorepo layout, frontend/backend architecture, processing pipeline, and evidence lineage |
-| **[docs/RESEARCH.md](docs/RESEARCH.md)** | Research novelty, structure-aware retrieval vs baseline RAG, hypotheses, and long-term vision |
-| **[docs/DATASET.md](docs/DATASET.md)** | Benchmark dataset schema, question difficulty taxonomy, and provenance binding |
-| **[docs/EVALUATION.md](docs/EVALUATION.md)** | 3-way RAG comparison (`BASELINE_RAG` vs `STRUCTURE_AWARE_RAG` vs `WITH_VERIFICATION`) & metrics |
-| **[docs/API.md](docs/API.md)** | Complete FastAPI REST API reference with request/response schemas |
-| **[docs/SECURITY.md](docs/SECURITY.md)** | Cookie auth, anti-IDOR isolation, PDF prompt injection defense, rate limiting, and sanitization |
-| **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** | Setup instructions, coding principles, and agentic AI operating guidelines |
-| **[docs/TESTING.md](docs/TESTING.md)** | Test strategy, test matrix, and verification commands |
+| **[docs/backend/frontend-contract-matrix.md](docs/backend/frontend-contract-matrix.md)** | 1:1 mapping between React frontend calls and FastAPI backend endpoints |
+| **[docs/backend/ADR-001-backend-architecture.md](docs/backend/ADR-001-backend-architecture.md)** | Architecture Decision Record for FastAPI, Local-First AI, and security |
+| **[docs/backend/database-design.md](docs/backend/database-design.md)** | Relational ERD, table specs, and vector index design across all 16 models |
+| **[docs/backend/security-review.md](docs/backend/security-review.md)** | Threat matrix covering Anti-IDOR (404), cookie auth, and prompt injection defense |
+| **[docs/backend/IMPLEMENTATION_STATUS.md](docs/backend/IMPLEMENTATION_STATUS.md)** | Verified technical checklist of completed subsystems |
+| **[docs/backend/final-audit/](docs/backend/final-audit/)** | Audit inventory, API coverage matrix, feature matrix, and gap analyses |
 
 ---
 
-## 13. License
+## 14. License
 
 Copyright © 2026 PaperLens Team. All rights reserved.
 
