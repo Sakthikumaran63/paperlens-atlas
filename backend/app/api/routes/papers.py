@@ -276,6 +276,25 @@ async def ask_paper_questions_main_endpoint(
         )
 
 
+
+@router.post("/papers/{paper_id}/reanalyze", status_code=status.HTTP_200_OK)
+async def reanalyze_paper_endpoint(
+    paper: Paper = Depends(get_workspace_scoped_paper),
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """
+    Force re-analysis of a paper by clearing the cached PaperAnalysis record.
+    The next GET /analysis, /methodology, /contributions request will re-run LLM extraction.
+    Use this after configuring a Gemini or OpenAI API key to get real LLM-powered results.
+    """
+    from app.models.paper_analysis import PaperAnalysis
+    from sqlalchemy import delete
+
+    await db.execute(delete(PaperAnalysis).where(PaperAnalysis.paper_id == paper.id))
+    await db.commit()
+    return {"status": "cleared", "paper_id": str(paper.id), "message": "Analysis cache cleared. Re-fetch /analysis to trigger fresh LLM extraction."}
+
+
 @router.get("/papers/{paper_id}/analysis", response_model=PaperAnalysisResponse)
 async def get_paper_analysis_endpoint(
     paper: Paper = Depends(get_workspace_scoped_paper),

@@ -33,7 +33,7 @@ class AIRouter:
         self.fallback_provider = fallback_provider or GeminiProvider()
         self.fallback_policy = fallback_policy or FallbackPolicy(
             confidence_threshold=getattr(settings, "LOCAL_CONFIDENCE_THRESHOLD", 0.50),
-            gemini_fallback_enabled=bool(getattr(settings, "GEMINI_API_KEY", None) or getattr(settings, "LLM_API_KEY", None)),
+            gemini_fallback_enabled=bool(getattr(settings, "GEMINI_API_KEY", None) or getattr(settings, "GEMINI_API_KEYS", None) or getattr(settings, "LLM_API_KEY", None)),
         )
 
     async def generate_grounded_answer(

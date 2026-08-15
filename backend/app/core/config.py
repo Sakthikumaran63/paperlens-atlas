@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     LLM_TEMPERATURE: float = 0.0
     MIN_SUPPORT_SCORE_THRESHOLD: float = 0.70
 
+    # Google Gemini provider (free tier available)
+    GEMINI_API_KEY: str = ""
+    GEMINI_API_KEYS: str = ""
+    GEMINI_MODEL: str = "gemini-flash-latest"
+
+    # Ollama local provider (http://localhost:11434 when Ollama is installed)
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3.2"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

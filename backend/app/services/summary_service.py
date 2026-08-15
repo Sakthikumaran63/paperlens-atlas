@@ -2,7 +2,6 @@ import json
 import logging
 from typing import Dict, List, Optional
 import uuid
-import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -129,33 +128,12 @@ class SummaryService:
         llm_svc = llm_service or self.llm_service
         raw_json_str = ""
 
-        if llm_svc.client is not None or settings.LLM_API_KEY:
-            try:
-                url = f"{settings.LLM_API_BASE.rstrip('/')}/chat/completions"
-                headers = {"Content-Type": "application/json", "Authorization": f"Bearer {settings.LLM_API_KEY}"}
-                payload = {
-                    "model": settings.LLM_MODEL,
-                    "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
-                    "temperature": 0.0,
-                    "response_format": {"type": "json_object"}
-                }
-
-                client = llm_svc.client
-                should_close = False
-                if client is None:
-                    client = httpx.AsyncClient(timeout=45.0)
-                    should_close = True
-
-                try:
-                    resp = await client.post(url, json=payload, headers=headers)
-                    if resp.status_code == 200:
-                        raw_json_str = resp.json()["choices"][0]["message"]["content"].strip()
-                finally:
-                    if should_close and client:
-                        await client.aclose()
-
-            except Exception as e:
-                logger.warning(f"LLM API call for summarization failed ({e}). Using deterministic section fallback.")
+        # Use unified extraction LLM router (OpenAI -> Gemini -> Ollama -> offline)
+        from app.services.extraction_llm_router import call_extraction_llm
+        try:
+            raw_json_str = await call_extraction_llm(system_prompt, user_prompt) or ""
+        except Exception as e:
+            logger.warning(f"Extraction LLM router failed for summarization ({e}). Using fallback.")
 
         if raw_json_str:
             try:

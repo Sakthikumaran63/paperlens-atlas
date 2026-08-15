@@ -1,7 +1,7 @@
 import type { PaperStatus } from "@/lib/mock-papers";
 import { cn } from "@/lib/utils";
 
-const map: Record<PaperStatus, { label: string; cls: string; dot: string }> = {
+const map: Record<string, { label: string; cls: string; dot: string }> = {
   ready: {
     label: "Ready",
     cls: "text-[color:var(--sage)] bg-[color:color-mix(in_oklab,var(--sage)_15%,transparent)]",
@@ -12,15 +12,31 @@ const map: Record<PaperStatus, { label: string; cls: string; dot: string }> = {
     cls: "text-[color:var(--ochre)] bg-[color:color-mix(in_oklab,var(--ochre)_18%,transparent)]",
     dot: "bg-[color:var(--ochre)]",
   },
+  uploading: {
+    label: "Uploading",
+    cls: "text-[color:var(--ochre)] bg-[color:color-mix(in_oklab,var(--ochre)_18%,transparent)]",
+    dot: "bg-[color:var(--ochre)]",
+  },
+  indexing: {
+    label: "Indexing",
+    cls: "text-[color:var(--ochre)] bg-[color:color-mix(in_oklab,var(--ochre)_18%,transparent)]",
+    dot: "bg-[color:var(--ochre)]",
+  },
   failed: {
     label: "Failed",
     cls: "text-destructive bg-destructive/10",
     dot: "bg-destructive",
   },
+  unknown: {
+    label: "Unknown",
+    cls: "text-muted-foreground bg-muted",
+    dot: "bg-muted-foreground",
+  },
 };
 
-export function StatusBadge({ status }: { status: PaperStatus }) {
-  const s = map[status];
+export function StatusBadge({ status }: { status: PaperStatus | string }) {
+  const key = (status ?? "unknown").toString().toLowerCase();
+  const s = map[key] ?? map["unknown"];
   return (
     <span
       className={cn(

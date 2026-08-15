@@ -31,6 +31,7 @@ import {
   getPaperMethodology,
   evaluatePaperBenchmark,
   retryPaperPipeline,
+  reanalyzePaper,
   type ContributionExtractionResponse,
   type MethodologyExtractionResponse,
   type PaperAnalysisResponse,
@@ -71,6 +72,7 @@ function PaperDetailPage() {
   const [evalLoading, setEvalLoading] = useState(false);
   const [evalReport, setEvalReport] = useState<EvaluationBenchmarkReport | null>(null);
   const [retryLoading, setRetryLoading] = useState(false);
+  const [reanalyzeLoading, setReanalyzeLoading] = useState(false);
 
   const handleRunBenchmark = async () => {
     setEvalModalOpen(true);
@@ -96,6 +98,26 @@ function PaperDetailPage() {
       // Handle gracefully
     } finally {
       setRetryLoading(false);
+    }
+  };
+
+  const handleReanalyze = async () => {
+    setReanalyzeLoading(true);
+    try {
+      await reanalyzePaper(paperId);
+      // Refresh all analysis data after clearing cache
+      const [anaData, methData, contribData] = await Promise.allSettled([
+        getPaperAnalysis(paperId),
+        getPaperMethodology(paperId),
+        getPaperContributions(paperId),
+      ]);
+      if (anaData.status === "fulfilled") setAnalysis(anaData.value);
+      if (methData.status === "fulfilled") setMethodology(methData.value);
+      if (contribData.status === "fulfilled") setContributions(contribData.value);
+    } catch {
+      // Handle gracefully
+    } finally {
+      setReanalyzeLoading(false);
     }
   };
 
@@ -291,6 +313,15 @@ function PaperDetailPage() {
             <BarChart3 className="h-3.5 w-3.5 text-primary" /> RAG Benchmark
           </button>
           <button
+            onClick={handleReanalyze}
+            disabled={reanalyzeLoading}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+            title="Clear cached analysis and re-run with LLM"
+          >
+            <Layers className={`h-3.5 w-3.5 text-primary ${reanalyzeLoading ? "animate-pulse" : ""}`} />
+            {reanalyzeLoading ? "Re-analyzing..." : "Re-analyze"}
+          </button>
+          <button
             onClick={() => setReaderOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
@@ -298,6 +329,7 @@ function PaperDetailPage() {
           </button>
         </div>
       </div>
+
 
       {/* 3-Way RAG Evaluation Benchmark Modal */}
       {evalModalOpen && (

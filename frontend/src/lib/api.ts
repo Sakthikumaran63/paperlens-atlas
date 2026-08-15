@@ -313,6 +313,16 @@ export async function retryPaperPipeline(paperId: string): Promise<any> {
   return await handleResponse<any>(resp);
 }
 
+export async function reanalyzePaper(paperId: string): Promise<any> {
+  const headers = await getAuthHeaders();
+  const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/reanalyze`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+  });
+  return await handleResponse<any>(resp);
+}
+
 export async function uploadPaper(file: File, workspaceId?: string): Promise<PaperUploadResponse> {
   const headers = await getAuthHeaders();
   const formData = new FormData();
