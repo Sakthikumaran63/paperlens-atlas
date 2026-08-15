@@ -460,3 +460,13 @@ export async function deleteAdminUser(userId: string): Promise<void> {
     throw await handleResponse<any>(resp);
   }
 }
+
+export async function getPaperChatHistory(paperId: string): Promise<QuestionAnsweringResponse[]> {
+  const headers = await getAuthHeaders();
+  const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/chat-history`, {
+    headers,
+    credentials: "include",
+  });
+  return await handleResponse<QuestionAnsweringResponse[]>(resp);
+}
+

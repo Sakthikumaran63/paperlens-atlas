@@ -17,7 +17,7 @@ import httpx
 
 sys.path.insert(0, os.path.abspath("backend"))
 
-BASE = "http://localhost:8000/api/v1"
+BASE = "http://127.0.0.1:8000/api/v1"
 
 
 async def main():

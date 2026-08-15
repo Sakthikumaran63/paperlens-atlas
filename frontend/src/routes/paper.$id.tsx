@@ -32,6 +32,7 @@ import {
   evaluatePaperBenchmark,
   retryPaperPipeline,
   reanalyzePaper,
+  getPaperChatHistory,
   type ContributionExtractionResponse,
   type MethodologyExtractionResponse,
   type PaperAnalysisResponse,
@@ -132,12 +133,34 @@ function PaperDetailPage() {
       const p = await getPaper(paperId);
       setPaper(p);
 
-      setMessages([
-        {
-          role: "assistant",
-          text: `Hi! I've indexed "${p.title}". Ask me any grounded question about its methodology, results, dataset, or contributions.`,
-        },
-      ]);
+      const welcomeMsg: Msg = {
+        role: "assistant",
+        text: `Hi! I've indexed "${p.title}". Ask me any grounded question about its methodology, results, dataset, or contributions.`,
+      };
+
+      // Load past Q&A chat history from database
+      let historyMsgs: Msg[] = [];
+      try {
+        const history = await getPaperChatHistory(paperId);
+        historyMsgs = history.flatMap((item) => [
+          {
+            role: "user" as const,
+            text: item.question,
+          },
+          {
+            role: "assistant" as const,
+            text: item.answer,
+            kind: item.abstained ? ("no-source" as const) : ("answer" as const),
+            supportScore: item.support_score,
+            abstained: item.abstained,
+            sources: item.sources,
+          },
+        ]);
+      } catch (err) {
+        console.warn("Failed to load chat history:", err);
+      }
+
+      setMessages([welcomeMsg, ...historyMsgs]);
 
       // Load analysis, methodology, and contributions in parallel
       const [anaData, methData, contribData] = await Promise.allSettled([

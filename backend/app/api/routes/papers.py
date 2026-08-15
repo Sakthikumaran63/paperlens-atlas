@@ -3,6 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db, get_workspace_scoped_paper
 from app.core.limiter import limiter
@@ -10,6 +11,9 @@ from app.models.enums import PaperStatus, PipelineStage, RetrievalMode
 from app.models.paper import Paper
 from app.models.user import User
 from app.models.workspace import Workspace
+from app.models.question import Question
+from app.models.answer import Answer
+from app.models.answer_evidence import AnswerEvidence
 from app.schemas.analysis import ClaimWithSource, PaperAnalysisResponse, StructuredPaperSummary
 from app.schemas.answer import AskQuestionRequest, GroundedAnswerResponse
 from app.schemas.contribution import ContributionEvidence, ContributionExtractionResponse, ExtractedContribution
@@ -212,6 +216,7 @@ async def select_paper_evidence_endpoint(
 async def ask_paper_question_endpoint(
     req: AskQuestionRequest,
     paper: Paper = Depends(get_workspace_scoped_paper),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> GroundedAnswerResponse:
     """
@@ -225,7 +230,8 @@ async def ask_paper_question_endpoint(
             paper_id=paper.id,
             question_text=req.question_text,
             mode=req.mode,
-            db=db
+            db=db,
+            user_id=current_user.id
         )
         return response
     except ValueError as val_err:
@@ -241,6 +247,7 @@ async def ask_paper_questions_main_endpoint(
     request: Request,
     req: QuestionAnsweringRequest,
     paper: Paper = Depends(get_workspace_scoped_paper),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> QuestionAnsweringResponse:
     """
@@ -266,7 +273,8 @@ async def ask_paper_questions_main_endpoint(
             paper_id=paper.id,
             question_text=req.question,
             mode=req.mode or RetrievalMode.STRUCTURE_AWARE_RAG,
-            db=db
+            db=db,
+            user_id=current_user.id
         )
         return response
     except ValueError as val_err:
@@ -436,4 +444,62 @@ async def delete_paper(
     await db.commit()
 
     return {"detail": "Paper deleted successfully.", "paper_id": str(pid)}
+
+
+@router.get("/papers/{paper_id}/chat-history", response_model=List[QuestionAnsweringResponse])
+async def get_paper_chat_history_endpoint(
+    paper: Paper = Depends(get_workspace_scoped_paper),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> List[QuestionAnsweringResponse]:
+    """
+    Retrieve past Q&A history for a given paper and user.
+    """
+    stmt = (
+        select(Question)
+        .where(
+            Question.paper_id == paper.id,
+            Question.user_id == current_user.id
+        )
+        .options(
+            selectinload(Question.answer)
+            .selectinload(Answer.evidences)
+            .selectinload(AnswerEvidence.chunk)
+        )
+        .order_by(Question.created_at.asc())
+    )
+    result = await db.execute(stmt)
+    questions = result.scalars().all()
+
+    chat_history = []
+    for q in questions:
+        source_items = []
+        if q.answer and q.answer.evidences:
+            for ev in q.answer.evidences:
+                page_no = ev.page_number if ev.page_number is not None else (ev.chunk.page_number if ev.chunk else 1)
+                sec_title = ev.section_title if ev.section_title else (ev.chunk.metadata_json.get("section_title") if (ev.chunk and ev.chunk.metadata_json) else "Document Text")
+                text_content = ev.quote_text if ev.quote_text else (ev.chunk.text if ev.chunk else "")
+                
+                source_items.append(
+                    SourceMetadataItem(
+                        page=page_no,
+                        section=sec_title,
+                        chunk_id=ev.chunk_id,
+                        text=text_content
+                    )
+                )
+
+        chat_history.append(
+            QuestionAnsweringResponse(
+                question_id=q.id,
+                question=q.question_text,
+                question_type=q.intent,
+                answer=q.answer.answer_text if q.answer else "No answer generated.",
+                abstained=q.answer.is_abstained if q.answer else True,
+                support_score=q.answer.support_score if (q.answer and q.answer.support_score is not None) else 0.0,
+                sources=source_items
+            )
+        )
+
+    return chat_history
 

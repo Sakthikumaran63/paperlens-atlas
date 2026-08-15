@@ -63,7 +63,8 @@ class AnswerGenerationService:
         mode: RetrievalMode = RetrievalMode.STRUCTURE_AWARE_RAG,
         db: AsyncSession = None,
         llm_service: Optional[LLMService] = None,
-        verification_service: Optional[EvidenceVerificationService] = None
+        verification_service: Optional[EvidenceVerificationService] = None,
+        user_id: Optional[uuid.UUID] = None,
     ) -> QuestionAnsweringResponse:
         if not question_text or not question_text.strip() or db is None:
             raise ValueError("Valid question_text and db session are required.")
@@ -202,9 +203,10 @@ class AnswerGenerationService:
         db_question = Question(
             workspace_id=paper.workspace_id,
             paper_id=paper.id,
+            user_id=user_id,
             question_text=question_text,
-            question_type=question_type,
-            confidence=q_classification.confidence
+            intent=question_type,
+            intent_confidence=q_classification.confidence
         )
         db.add(db_question)
         await db.flush()
@@ -264,7 +266,8 @@ class AnswerGenerationService:
         mode: RetrievalMode = RetrievalMode.STRUCTURE_AWARE_RAG,
         db: AsyncSession = None,
         llm_service: Optional[LLMService] = None,
-        verification_service: Optional[EvidenceVerificationService] = None
+        verification_service: Optional[EvidenceVerificationService] = None,
+        user_id: Optional[uuid.UUID] = None,
     ) -> GroundedAnswerResponse:
         # Wrapper calling pipeline and converting response for backwards compatibility
         qa_resp = await self.answer_question_pipeline(
@@ -273,7 +276,8 @@ class AnswerGenerationService:
             mode=mode,
             db=db,
             llm_service=llm_service,
-            verification_service=verification_service
+            verification_service=verification_service,
+            user_id=user_id,
         )
 
         bound_evidence_items = [
