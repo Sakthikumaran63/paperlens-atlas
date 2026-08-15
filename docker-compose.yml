@@ -1,20 +1,20 @@
 version: '3.8'
 
 services:
-  db:
+  postgres:
     image: pgvector/pgvector:pg16
-    container_name: paperlens-db
-    restart: always
+    container_name: paperlens-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: paperlens
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-paperlens_db}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d paperlens"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-paperlens_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -24,18 +24,24 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: paperlens-backend
-    restart: always
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ENV: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-paperlens_db}
+      SECRET_KEY: ${SECRET_KEY:-paperlens-super-secret-production-key-change-me-12345}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      USE_LOCAL_FALLBACK: "true"
+      CORS_ORIGINS: "http://localhost:5173,http://localhost:3000,http://localhost:80"
     ports:
       - "8000:8000"
-    environment:
-      - PROJECT_NAME=paperlens-backend
-      - ENV=development
-      - LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/paperlens
-      - CORS_ORIGINS=["*"]
-    depends_on:
-      db:
-        condition: service_healthy
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_models:/app/models_cache
 
 volumes:
-  pgdata:
+  postgres_data:
+  backend_uploads:
+  backend_models:

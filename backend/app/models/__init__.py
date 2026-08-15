@@ -13,6 +13,8 @@ from app.models.answer import Answer
 from app.models.answer_evidence import AnswerEvidence
 from app.models.activity_log import ActivityLog
 from app.models.ai_execution_log import AIExecutionLog
+from app.models.ai_model import AIModel
+from app.models.experiment import Experiment, ExperimentRun
 
 __all__ = [
     "Base",
@@ -32,4 +34,8 @@ __all__ = [
     "AnswerEvidence",
     "ActivityLog",
     "AIExecutionLog",
+    "AIModel",
+    "Experiment",
+    "ExperimentRun",
 ]
+

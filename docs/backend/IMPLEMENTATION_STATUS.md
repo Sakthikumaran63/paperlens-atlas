@@ -10,7 +10,7 @@
 | Subsystem | Requirement | Status | Verification & Evidence |
 |---|---|---|---|
 | **Architecture** | Modular monolith with FastAPI, Pydantic v2, async SQLAlchemy 2.0 | **COMPLETE** | Validated via `uvicorn app.main:app` and OpenAPI schema |
-| **Database** | 11 relational models with pgvector & SQLite compatibility shims | **COMPLETE** | `paperlens_local.db` initialized with full schema & constraints |
+| **Database** | 16 relational models with pgvector, AI models registry, experiments & SQLite shims | **COMPLETE** | `paperlens_v2.db` initialized with 16 tables, constraints, telemetry & evaluation runs |
 | **Authentication** | `httpOnly`, `SameSite=Lax` cookie (`paperlens_token`) + `/auth/me` | **COMPLETE** | Tested via `scratch/test_improvements.py` (Test 1) |
 | **Authorization & Tenancy** | Systematic Anti-IDOR query isolation returning `404 Not Found` | **COMPLETE** | Tested via `scratch/test_improvements.py` (Test 2) |
 | **PDF Ingestion Pipeline** | 5-stage async pipeline (Extracting -> Structuring -> Chunking -> Embedding -> Analyzing) | **COMPLETE** | 6/6 base papers processed to `READY` state |

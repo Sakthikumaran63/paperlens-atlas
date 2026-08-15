@@ -29,7 +29,10 @@ class Paper(Base):
     authors: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     abstract: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     publication_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    doi: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    source_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     file_path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
     page_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -41,12 +44,16 @@ class Paper(Base):
     )
     progress: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     stage_details_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=True)
+    error_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     processing_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     # Relationships

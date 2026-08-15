@@ -25,9 +25,12 @@ class AnswerEvidence(Base):
         GUID, ForeignKey("paper_chunks.id", ondelete="CASCADE"), nullable=False, index=True
     )
     quote_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    # Documented in database-design.md §2.11 — citation verification fields
+    quote_start: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    quote_end: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Documented in database-design.md §2.11 & Master Prompt §12 — citation verification fields
     verification_method: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)  # EXACT | RAPIDFUZZ_PARTIAL
     verification_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    support_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     page_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     section_title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     relevance_explanation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
