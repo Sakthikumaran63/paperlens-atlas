@@ -350,3 +350,11 @@ Four Gemini API keys (`PL_01`–`PL_04`) configured in `GEMINI_API_KEYS` for rou
 - On paper open, `GET /papers/{paper_id}/chat-history` restores full conversation across logout/re-login.
 - Answer evidences include `page_number`, `section_title`, `quote_text`, and chunk references.
 
+### 12.6 Theme Management System (Dark & Light Mode)
+- **Theme Utility** (`src/lib/theme.ts`): `getStoredTheme`, `applyTheme`, `initTheme` with `localStorage` persistence and system preference fallback (`prefers-color-scheme`).
+- **OKLCH Dark Palette** (`src/styles.css`): `.dark` class defining deep charcoal background (`#161514`), elevated paper card surface (`#201E1C`), warm off-white ink text (`#F5F3EF`), and glowing terracotta accents (`#E07A5F`).
+- **Global Header Toggle** (`src/components/app/ThemeToggle.tsx`): Accessible Sun/Moon toggle button embedded in `TopBar.tsx` for instant theme switching on any page.
+- **Settings Integration** (`src/routes/settings.tsx`): Light mode / Dark mode selector cards bound to theme management handler.
+- **Vercel Build Fix**: Force-tracked `src/lib/theme.ts` to fix production bundle dependency loading on Vercel deployment.
+
+
