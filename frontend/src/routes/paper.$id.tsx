@@ -12,6 +12,10 @@ import {
   SearchX,
   CheckCircle2,
   Bookmark,
+  BarChart3,
+  RotateCw,
+  X,
+  Layers,
 } from "lucide-react";
 import { TypingIndicator } from "@/components/app/states/Skeletons";
 import { AppShell } from "@/components/app/AppShell";
@@ -25,12 +29,15 @@ import {
   getPaperAnalysis,
   getPaperContributions,
   getPaperMethodology,
+  evaluatePaperBenchmark,
+  retryPaperPipeline,
   type ContributionExtractionResponse,
   type MethodologyExtractionResponse,
   type PaperAnalysisResponse,
   type PaperResponse,
   type QuestionAnsweringResponse,
   type SourceMetadataItem,
+  type EvaluationBenchmarkReport,
 } from "@/lib/api";
 
 export const Route = createFileRoute("/paper/$id")({
@@ -58,6 +65,39 @@ function PaperDetailPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [readerOpen, setReaderOpen] = useState(false);
+
+  // 3-Way RAG Evaluation Benchmark state
+  const [evalModalOpen, setEvalModalOpen] = useState(false);
+  const [evalLoading, setEvalLoading] = useState(false);
+  const [evalReport, setEvalReport] = useState<EvaluationBenchmarkReport | null>(null);
+  const [retryLoading, setRetryLoading] = useState(false);
+
+  const handleRunBenchmark = async () => {
+    setEvalModalOpen(true);
+    if (!evalReport) {
+      setEvalLoading(true);
+      try {
+        const report = await evaluatePaperBenchmark(paperId);
+        setEvalReport(report);
+      } catch (err: any) {
+        // Handle gracefully
+      } finally {
+        setEvalLoading(false);
+      }
+    }
+  };
+
+  const handleRetryPipeline = async () => {
+    setRetryLoading(true);
+    try {
+      await retryPaperPipeline(paperId);
+      await fetchPaperDetails();
+    } catch {
+      // Handle gracefully
+    } finally {
+      setRetryLoading(false);
+    }
+  };
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -226,20 +266,134 @@ function PaperDetailPage() {
         />
       )}
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <Link
           to="/papers"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Back to library
         </Link>
-        <button
-          onClick={() => setReaderOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
-        >
-          <BookOpen className="h-3.5 w-3.5" /> Open PDF Reader
-        </button>
+        <div className="flex items-center gap-2">
+          {mappedStatus === "failed" && (
+            <button
+              onClick={handleRetryPipeline}
+              disabled={retryLoading}
+              className="inline-flex items-center gap-1.5 rounded-md border border-destructive/40 bg-background px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10"
+            >
+              <RotateCw className={`h-3.5 w-3.5 ${retryLoading ? "animate-spin" : ""}`} />
+              {retryLoading ? "Retrying..." : "Retry Pipeline"}
+            </button>
+          )}
+          <button
+            onClick={handleRunBenchmark}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+          >
+            <BarChart3 className="h-3.5 w-3.5 text-primary" /> RAG Benchmark
+          </button>
+          <button
+            onClick={() => setReaderOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            <BookOpen className="h-3.5 w-3.5" /> Open PDF Reader
+          </button>
+        </div>
       </div>
+
+      {/* 3-Way RAG Evaluation Benchmark Modal */}
+      {evalModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-background p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-9 w-9 place-items-center rounded-md bg-primary text-primary-foreground">
+                  <BarChart3 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-serif-editorial text-xl font-semibold text-foreground">
+                    3-Way RAG Evaluation Benchmark Report
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Baseline RAG vs. Structure-Aware RAG vs. Structure-Aware with RapidFuzz Verification
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEvalModalOpen(false)}
+                className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {evalLoading ? (
+              <div className="py-16 text-center text-sm text-muted-foreground">
+                <RotateCw className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
+                Evaluating retrieval Recall@K, Precision@K, MRR, Grounding Accuracy, and Abstention...
+              </div>
+            ) : evalReport ? (
+              <div className="space-y-6">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border border-border">
+                    <thead className="bg-muted/50 text-foreground font-semibold">
+                      <tr>
+                        <th className="p-3 border-b border-border">Configuration</th>
+                        <th className="p-3 border-b border-border">Recall@K</th>
+                        <th className="p-3 border-b border-border">Precision@K</th>
+                        <th className="p-3 border-b border-border">MRR</th>
+                        <th className="p-3 border-b border-border">Grounding Acc.</th>
+                        <th className="p-3 border-b border-border">Abstention Acc.</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {evalReport.configurations.map((cfg, idx) => (
+                        <tr key={idx} className={idx === 2 ? "bg-primary/5 font-medium" : ""}>
+                          <td className="p-3 text-foreground flex items-center gap-1.5">
+                            {idx === 2 && <CheckCircle2 className="h-3.5 w-3.5 text-primary" />}
+                            {cfg.config_name}
+                          </td>
+                          <td className="p-3">{(cfg.retrieval.recall_at_k * 100).toFixed(1)}%</td>
+                          <td className="p-3">{(cfg.retrieval.precision_at_k * 100).toFixed(1)}%</td>
+                          <td className="p-3">{cfg.retrieval.mrr.toFixed(3)}</td>
+                          <td className="p-3">{(cfg.grounding.evidence_precision * 100).toFixed(1)}%</td>
+                          <td className="p-3">{(cfg.abstention.unanswerable_detection * 100).toFixed(1)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3 text-xs">
+                  <div className="rounded-md border border-border bg-muted/20 p-3">
+                    <span className="font-semibold text-foreground block mb-1">Structure-Aware Boost</span>
+                    <span className="text-muted-foreground">Section routing prioritizes relevant chapters and filters out historical surveys.</span>
+                  </div>
+                  <div className="rounded-md border border-border bg-muted/20 p-3">
+                    <span className="font-semibold text-foreground block mb-1">RapidFuzz Citation Verification</span>
+                    <span className="text-muted-foreground">Rejects hallucinated quotes (Threshold S &ge; 90) before DB persistence.</span>
+                  </div>
+                  <div className="rounded-md border border-border bg-muted/20 p-3">
+                    <span className="font-semibold text-foreground block mb-1">Controlled Abstention Guard</span>
+                    <span className="text-muted-foreground">Safely refuses unanswerable queries when support score &lt; 0.70.</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => setEvalModalOpen(false)}
+                    className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+                  >
+                    Close Benchmark
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                Benchmark evaluation failed to load. Please try again.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">

@@ -225,6 +225,49 @@ export async function getPapers(): Promise<PaperResponse[]> {
   return await handleResponse<PaperResponse[]>(resp);
 }
 
+export interface RetrievalMetrics {
+  recall_at_k: number;
+  precision_at_k: number;
+  mrr: number;
+}
+
+export interface GroundingMetrics {
+  evidence_precision: number;
+  evidence_recall: number;
+  unsupported_claim_rate: number;
+}
+
+export interface AbstentionMetrics {
+  answerable_accuracy: number;
+  unanswerable_detection: number;
+  false_answer_rate: number;
+}
+
+export interface ConfigurationEvalReport {
+  config_name: string;
+  total_questions: number;
+  answerable_count: number;
+  unanswerable_count: number;
+  retrieval: RetrievalMetrics;
+  grounding: GroundingMetrics;
+  abstention: AbstentionMetrics;
+}
+
+export interface EvaluationBenchmarkReport {
+  benchmark_id: string;
+  timestamp: string;
+  configurations: ConfigurationEvalReport[];
+}
+
+export interface SystemHealthResponse {
+  status: string;
+  environment: string;
+  database: string;
+  ai_service: string;
+  version?: string;
+  uptime?: string;
+}
+
 export async function getPaperDetail(paperId: string): Promise<PaperResponse> {
   const headers = await getAuthHeaders();
   const resp = await fetch(`${API_BASE_URL}/papers/${paperId}`, {
@@ -232,6 +275,23 @@ export async function getPaperDetail(paperId: string): Promise<PaperResponse> {
     credentials: "include",
   });
   return await handleResponse<PaperResponse>(resp);
+}
+
+export const getPaper = getPaperDetail;
+
+export async function evaluatePaperBenchmark(paperId: string): Promise<EvaluationBenchmarkReport> {
+  const headers = await getAuthHeaders();
+  const resp = await fetch(`${API_BASE_URL}/papers/${paperId}/evaluate`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+  });
+  return await handleResponse<EvaluationBenchmarkReport>(resp);
+}
+
+export async function getSystemHealth(): Promise<SystemHealthResponse> {
+  const resp = await fetch(`${API_BASE_URL}/health`);
+  return await handleResponse<SystemHealthResponse>(resp);
 }
 
 export async function getPaperStatus(paperId: string): Promise<PaperStatusResponse> {
