@@ -100,3 +100,11 @@ backend/dataset/*.json
 
 # Agent memory & temporary scratch
 .agent_journal.json
+.agent_log.json
+.agent_code_map.md
+scratch/
+
+# Ensure .env.example files are tracked (not secrets)
+!.env.example
+!backend/.env.example
+!frontend/.env.example

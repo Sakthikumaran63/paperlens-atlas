@@ -65,11 +65,12 @@ Generic AI document assistants treat complex PDFs as unstructured plain-text dum
 |---|---|---|
 | **Frontend** | React 18, Vite 8, TanStack Router | Vanilla CSS & Tailwind Utility Design System |
 | **Backend** | Python 3.13, FastAPI, Pydantic v2 | Uvicorn ASGI Web Server |
-| **Database** | PostgreSQL + `pgvector` | SQLite3 + In-Memory Vector & GUID Patch |
+| **Database** | Supabase Cloud PostgreSQL + `pgvector` | SQLite3 + In-Memory Vector & GUID Patch |
 | **ORM** | SQLAlchemy 2.0 (Async) | `aiosqlite` |
 | **PDF Extraction** | PyMuPDF (`fitz`) | Multi-page text block parsing |
 | **Embeddings** | OpenAI `text-embedding-3-small` (1536d) | Deterministic Hashing Trick Pseudo-Embeddings |
-| **LLM Engine** | OpenAI `gpt-4o-mini` | Offline Extractive Keyword Ranking Q&A |
+| **LLM Engine** | Google Gemini (4-key rotation, multi-model cascade) | Ollama `llama3.2` local inference |
+| **Paper Discovery** | Semantic Scholar Graph API + Recommendations API | CrossRef REST API (automatic fallback on 429) |
 
 ---
 
@@ -304,3 +305,48 @@ paperlens-atlas/
 ├── scratch/              # Automated verification & test scripts
 └── DOCUMENTATION.md      # Master technical documentation
 ```
+
+---
+
+## 12. Recent Feature Additions
+
+### 12.1 Supabase Cloud PostgreSQL Migration
+- **Database**: All 16 PaperLens tables migrated to Supabase Cloud PostgreSQL (`db.wuacpjaxqjmmhpnyibdo.supabase.co:5432`).
+- **pgvector**: Native `vector` extension enabled on Supabase — no `sqlite_shim.py` workaround needed in production.
+- **SSL**: `connect_args={"ssl": "require"}` configured in `backend/app/db/session.py` for secure cloud connections.
+- **Alembic**: Migrations stamped to `head` (`002_add_oauth_and_admin_fields`). URL percent-encoding (`%40`) handled safely.
+
+### 12.2 Multi-Key Gemini API Rotation
+Four Gemini API keys (`PL_01`–`PL_04`) configured in `GEMINI_API_KEYS` for round-robin load distribution. The system cascades through model tiers:
+1. `gemini-flash-latest` (primary, fastest)
+2. `gemini-3.5-flash` (first fallback)
+3. `gemini-2.5-flash-preview-05-20` (second fallback)
+4. `gemini-2.5-flash-lite-preview-06-17` (final fallback)
+
+### 12.3 Related Research Papers — Semantic Scholar + CrossRef
+- **Backend service**: `backend/app/services/semantic_scholar_service.py`
+  - Queries [Semantic Scholar Graph API](https://api.semanticscholar.org/graph/v1/paper/search) to find paperId for a seed title.
+  - Uses `recommendations/v1/papers/forpaper/{paperId}` endpoint for related paper suggestions.
+  - **Automatic CrossRef fallback**: If Semantic Scholar returns 429 (rate-limited), the service transparently queries [CrossRef REST API](https://api.crossref.org/works) with no user-visible error.
+- **API endpoints** (`backend/app/api/routes/papers.py`):
+  - `GET /api/v1/papers/recommendations/search?title={title}&limit=5` — Search by paper title string.
+  - `GET /api/v1/papers/{paper_id}/recommendations?limit=5` — Recommendations for an indexed paper.
+- **Frontend** (`src/routes/paper.$id.tsx`):
+  - Fetches recommendations in parallel with analysis/methodology/contributions.
+  - Renders a **"Related Research Papers"** section with title, authors, year, abstract preview, and clickable DOI/URL links.
+
+### 12.4 Bug Fixes & Stability
+| Issue | Fix |
+|---|---|
+| `asyncpg.exceptions.CharacterNotInRepertoireError` (NUL bytes in PDF text) | Strip `\x00` in `pdf_extractor.py` before DB writes |
+| `RetrievedEvidence` / `AnswerEvidence` wrong column names | Fixed field mappings in `answer_generation_service.py` |
+| `generate_offline_answer` signature mismatch | Added `evidence_package` support + `_OfflineAnswerResult` wrapper in `offline_ai.py` |
+| `/papers/recommendations/search` returning 404 | Moved route above `/{paper_id}` parameterized routes (FastAPI routing order) |
+| `ImportError: SourceMetadataItem` | Corrected import to `app.schemas.question` |
+| Frontend `tsc` errors on `EmptyState` / `ConfirmDialog` | Added `actionLabel`/`onAction` props to `EmptyState.tsx`; added `tone` prop to `ConfirmDialog.tsx` |
+
+### 12.5 Persistent Q&A Chat History
+- Every `Question` and `Answer` stored with `user_id` linkage in Supabase.
+- On paper open, `GET /papers/{paper_id}/chat-history` restores full conversation across logout/re-login.
+- Answer evidences include `page_number`, `section_title`, `quote_text`, and chunk references.
+

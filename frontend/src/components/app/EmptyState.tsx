@@ -6,9 +6,23 @@ interface Props {
   title: string;
   description?: string;
   action?: ReactNode;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
-export function EmptyState({ icon: Icon, title, description, action }: Props) {
+export function EmptyState({ icon: Icon, title, description, action, actionLabel, onAction }: Props) {
+  const actionBtn =
+    action ||
+    (actionLabel && onAction ? (
+      <button
+        type="button"
+        onClick={onAction}
+        className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+      >
+        {actionLabel}
+      </button>
+    ) : null);
+
   return (
     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-surface/60 px-6 py-16 text-center">
       {Icon && (
@@ -18,7 +32,7 @@ export function EmptyState({ icon: Icon, title, description, action }: Props) {
       )}
       <h3 className="font-serif-editorial text-lg text-foreground">{title}</h3>
       {description && <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>}
-      {action && <div className="mt-5">{action}</div>}
+      {actionBtn && <div className="mt-5">{actionBtn}</div>}
     </div>
   );
 }

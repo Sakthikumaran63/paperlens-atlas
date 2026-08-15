@@ -392,7 +392,7 @@ class PaperPipelineOrchestrator:
         flag_modified(paper, "stage_details_json")
 
         db.add(paper)
-        await db.flush()
+        await db.commit()
 
     async def _complete_stage(self, db: AsyncSession, paper: Any, stage: PaperStage) -> None:
         _, end_progress = STAGE_PROGRESS[stage]
@@ -416,7 +416,7 @@ class PaperPipelineOrchestrator:
         flag_modified(paper, "stage_details_json")
 
         db.add(paper)
-        await db.flush()
+        await db.commit()
 
 
     async def _mark_ready(self, db: AsyncSession, paper: Any) -> None:
@@ -438,7 +438,7 @@ class PaperPipelineOrchestrator:
         flag_modified(paper, "stage_details_json")
 
         db.add(paper)
-        await db.flush()
+        await db.commit()
 
     async def _mark_failed(self, db: AsyncSession, paper: Any, stage: PaperStage, user_message: str) -> None:
         paper.status = PaperStatus.FAILED
@@ -467,7 +467,7 @@ class PaperPipelineOrchestrator:
         flag_modified(paper, "stage_details_json")
 
         db.add(paper)
-        await db.flush()
+        await db.commit()
 
     @staticmethod
     def _friendly_error_message(stage: PaperStage, exc: Exception) -> str:

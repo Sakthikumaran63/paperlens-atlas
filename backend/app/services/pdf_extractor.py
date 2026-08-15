@@ -114,7 +114,8 @@ class PDFExtractor:
                             block_texts.append(text)
 
                 raw_text = "\n\n".join(block_texts) if block_texts else page.get_text("text")
-                cleaned_text = self.clean_text(raw_text)
+                raw_text = (raw_text or "").replace("\x00", "")
+                cleaned_text = self.clean_text(raw_text).replace("\x00", "")
 
                 char_count = len(cleaned_text)
                 word_count = len(cleaned_text.split())
@@ -122,17 +123,27 @@ class PDFExtractor:
                 extracted_pages.append(
                     ExtractedPage(
                         page_number=page_num,
-                        raw_text=raw_text or "",
-                        cleaned_text=cleaned_text or "",
+                        raw_text=raw_text,
+                        cleaned_text=cleaned_text,
                         character_count=char_count,
                         word_count=word_count
                     )
                 )
 
             title_cand = self.detect_title_candidate(doc, extracted_pages)
+            if title_cand:
+                title_cand = title_cand.replace("\x00", "")
             author_cands = self.detect_author_candidates(doc, extracted_pages)
+            if author_cands:
+                author_cands = [a.replace("\x00", "") for a in author_cands]
 
-            metadata_dict = dict(doc.metadata) if doc.metadata else {}
+            metadata_dict = {}
+            if doc.metadata:
+                for k, v in doc.metadata.items():
+                    if isinstance(v, str):
+                        metadata_dict[k] = v.replace("\x00", "")
+                    else:
+                        metadata_dict[k] = v
 
             result = ExtractedDocument(
                 title_candidate=title_cand,

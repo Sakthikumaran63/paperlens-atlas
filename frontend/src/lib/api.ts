@@ -470,3 +470,49 @@ export async function getPaperChatHistory(paperId: string): Promise<QuestionAnsw
   return await handleResponse<QuestionAnsweringResponse[]>(resp);
 }
 
+export interface RecommendedPaper {
+  title: string;
+  year?: number;
+  abstract?: string;
+  authors: string[];
+  url?: string;
+}
+
+export interface PaperRecommendationsResponse {
+  seed_paper_id?: string;
+  seed_title: string;
+  count: number;
+  recommendations: RecommendedPaper[];
+}
+
+export async function getPaperRecommendations(
+  paperId: string,
+  limit: number = 5
+): Promise<PaperRecommendationsResponse> {
+  const headers = await getAuthHeaders();
+  const resp = await fetch(
+    `${API_BASE_URL}/papers/${paperId}/recommendations?limit=${limit}`,
+    {
+      headers,
+      credentials: "include",
+    }
+  );
+  return await handleResponse<PaperRecommendationsResponse>(resp);
+}
+
+export async function searchPaperRecommendations(
+  title: string,
+  limit: number = 5
+): Promise<PaperRecommendationsResponse> {
+  const headers = await getAuthHeaders();
+  const resp = await fetch(
+    `${API_BASE_URL}/papers/recommendations/search?title=${encodeURIComponent(title)}&limit=${limit}`,
+    {
+      headers,
+      credentials: "include",
+    }
+  );
+  return await handleResponse<PaperRecommendationsResponse>(resp);
+}
+
+

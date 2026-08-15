@@ -588,3 +588,21 @@ pytest
 Copyright © 2026 PaperLens Team. All rights reserved.
 
 > **Understand research papers. Ask questions. Follow the evidence.**
+
+---
+
+## 15. Recent Updates & Changelog
+
+### v2.1 — Related Paper Discovery + Cloud Database
+
+| Feature | Details |
+|---|---|
+| **Supabase PostgreSQL** | All 16 tables migrated to Supabase Cloud with native `pgvector` and SSL. |
+| **Gemini 4-Key Rotation** | `GEMINI_API_KEYS` supports up to N comma-separated keys with round-robin dispatch and 4-tier model cascade fallback. |
+| **Semantic Scholar Recommendations** | `GET /api/v1/papers/{paper_id}/recommendations` returns 5 related academic papers using the Semantic Scholar API. |
+| **CrossRef Fallback** | If Semantic Scholar rate-limits (HTTP 429), the service transparently switches to CrossRef REST API — zero user-visible degradation. |
+| **Persistent Q&A History** | All questions and answers stored per-user in Supabase. Restored on every login without re-upload. |
+| **PDF NUL Byte Sanitization** | PostgreSQL `asyncpg` no longer errors on PDFs containing binary `\x00` bytes. |
+| **Frontend .env.example** | `frontend/.env.example` added with documented Supabase + API URL template. |
+| **EmptyState & ConfirmDialog** | `actionLabel`/`onAction` props added to `EmptyState.tsx`; `tone` prop added to `ConfirmDialog.tsx`. |
+

@@ -19,6 +19,7 @@ interface Props {
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
+  tone?: "neutral" | "danger" | "warning";
   onConfirm: () => void;
 }
 
@@ -30,8 +31,10 @@ export function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   destructive,
+  tone,
   onConfirm,
 }: Props) {
+  const isDestructive = destructive || tone === "danger";
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="border-border bg-surface">
@@ -53,7 +56,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             className={cn(
               "rounded-md px-4 py-2 text-sm font-medium",
-              destructive
+              isDestructive
                 ? "border border-destructive/40 bg-background text-destructive hover:bg-destructive/10"
                 : "bg-primary text-primary-foreground hover:bg-primary/90",
             )}

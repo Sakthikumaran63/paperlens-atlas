@@ -152,6 +152,53 @@ export function ErrorState({
   );
 }
 
+interface EmptyProps {
+  title?: string;
+  description?: ReactNode;
+  actionLabel?: string;
+  onAction?: () => void;
+  primary?: ReactNode;
+  secondary?: ReactNode;
+  compact?: boolean;
+  className?: string;
+}
+
+export function EmptyState({
+  title = "No items found",
+  description,
+  actionLabel,
+  onAction,
+  primary,
+  secondary,
+  compact,
+  className,
+}: EmptyProps) {
+  const primaryBtn =
+    primary ||
+    (actionLabel && onAction ? (
+      <button
+        type="button"
+        onClick={onAction}
+        className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+      >
+        {actionLabel}
+      </button>
+    ) : null);
+
+  return (
+    <StatePanel
+      tone="neutral"
+      icon={FileX2}
+      title={title}
+      description={description}
+      primary={primaryBtn}
+      secondary={secondary}
+      compact={compact}
+      className={className}
+    />
+  );
+}
+
 export function NetworkErrorState({
   onRetry,
   compact,

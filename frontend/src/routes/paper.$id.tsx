@@ -16,6 +16,7 @@ import {
   RotateCw,
   X,
   Layers,
+  ExternalLink,
 } from "lucide-react";
 import { TypingIndicator } from "@/components/app/states/Skeletons";
 import { AppShell } from "@/components/app/AppShell";
@@ -33,6 +34,7 @@ import {
   retryPaperPipeline,
   reanalyzePaper,
   getPaperChatHistory,
+  getPaperRecommendations,
   type ContributionExtractionResponse,
   type MethodologyExtractionResponse,
   type PaperAnalysisResponse,
@@ -40,6 +42,7 @@ import {
   type QuestionAnsweringResponse,
   type SourceMetadataItem,
   type EvaluationBenchmarkReport,
+  type RecommendedPaper,
 } from "@/lib/api";
 
 export const Route = createFileRoute("/paper/$id")({
@@ -63,6 +66,7 @@ function PaperDetailPage() {
   const [analysis, setAnalysis] = useState<PaperAnalysisResponse | null>(null);
   const [methodology, setMethodology] = useState<MethodologyExtractionResponse | null>(null);
   const [contributions, setContributions] = useState<ContributionExtractionResponse | null>(null);
+  const [recommendations, setRecommendations] = useState<RecommendedPaper[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -162,16 +166,20 @@ function PaperDetailPage() {
 
       setMessages([welcomeMsg, ...historyMsgs]);
 
-      // Load analysis, methodology, and contributions in parallel
-      const [anaData, methData, contribData] = await Promise.allSettled([
+      // Load analysis, methodology, contributions, and Semantic Scholar recommendations in parallel
+      const [anaData, methData, contribData, recData] = await Promise.allSettled([
         getPaperAnalysis(paperId),
         getPaperMethodology(paperId),
         getPaperContributions(paperId),
+        getPaperRecommendations(paperId, 5),
       ]);
 
       if (anaData.status === "fulfilled") setAnalysis(anaData.value);
       if (methData.status === "fulfilled") setMethodology(methData.value);
       if (contribData.status === "fulfilled") setContributions(contribData.value);
+      if (recData.status === "fulfilled" && recData.value) {
+        setRecommendations(recData.value.recommendations || []);
+      }
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to load paper details.");
     } finally {
@@ -570,6 +578,57 @@ function PaperDetailPage() {
               </p>
             </SectionCard>
           )}
+
+          {/* Related Reference Papers (Semantic Scholar API) */}
+          <SectionCard eyebrow="Discovery" title="Related Research Papers">
+            {recommendations.length > 0 ? (
+              <div className="space-y-4">
+                {recommendations.map((rec, idx) => (
+                  <div
+                    key={idx}
+                    className="rounded-lg border border-border bg-background p-4 shadow-2xs hover:border-primary/40 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <h4 className="font-serif-editorial text-base font-medium text-foreground">
+                        {rec.title}
+                      </h4>
+                      {rec.url && (
+                        <a
+                          href={rec.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                        >
+                          View Paper <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      {rec.authors && rec.authors.length > 0 && (
+                        <span className="inline-flex items-center gap-1">
+                          <Users className="h-3 w-3" /> {rec.authors.slice(0, 3).join(", ")}{rec.authors.length > 3 ? " et al." : ""}
+                        </span>
+                      )}
+                      {rec.year && (
+                        <span className="inline-flex items-center gap-1">
+                          <Calendar className="h-3 w-3" /> {rec.year}
+                        </span>
+                      )}
+                    </div>
+                    {rec.abstract && (
+                      <p className="mt-2 text-xs leading-relaxed text-muted-foreground line-clamp-3">
+                        {rec.abstract}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-6 text-center text-xs text-muted-foreground">
+                No related papers found for this research topic yet.
+              </div>
+            )}
+          </SectionCard>
         </div>
 
         {/* Grounded Q&A Assistant Column */}

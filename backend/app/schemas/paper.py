@@ -25,6 +25,9 @@ __all__ = [
     "PaperUploadResponse",
     "PaperStatusResponse",
     "PaperRetryResponse",
+    "PaperResponse",
+    "RecommendedPaper",
+    "PaperRecommendationsResponse",
 ]
 
 
@@ -95,4 +98,20 @@ class PaperResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class RecommendedPaper(BaseModel):
+    title: str
+    year: Optional[int] = None
+    abstract: Optional[str] = None
+    authors: list[str] = Field(default_factory=list)
+    url: Optional[str] = None
+
+
+class PaperRecommendationsResponse(BaseModel):
+    seed_paper_id: Optional[uuid.UUID] = None
+    seed_title: str
+    count: int
+    recommendations: list[RecommendedPaper]
+
 

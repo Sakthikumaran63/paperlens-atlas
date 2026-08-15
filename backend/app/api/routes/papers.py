@@ -20,8 +20,15 @@ from app.schemas.contribution import ContributionEvidence, ContributionExtractio
 from app.schemas.evaluation import EvaluationBenchmarkReport, EvaluationDataset
 from app.schemas.evidence import EvidencePackage
 from app.schemas.methodology import MethodologyEvidenceItem, MethodologyExtractionResponse
-from app.schemas.paper import PaperResponse, PaperStatusResponse, PaperUploadResponse
-from app.schemas.question import QuestionAnsweringRequest, QuestionAnsweringResponse
+from app.schemas.paper import (
+    PaperResponse,
+    PaperStatusResponse,
+    PaperUploadResponse,
+    RecommendedPaper,
+    PaperRecommendationsResponse
+)
+from app.services.semantic_scholar_service import SemanticScholarService
+from app.schemas.question import QuestionAnsweringRequest, QuestionAnsweringResponse, SourceMetadataItem
 from app.schemas.retrieval import RetrievalRequest, RetrievedChunkCandidate
 from app.services.answer_generation_service import AnswerGenerationService
 from app.services.contribution_extraction_service import ContributionExtractionService
@@ -96,6 +103,31 @@ async def upload_paper(
         paper_id=new_paper.id,
         file_name=new_paper.file_name,
         status=new_paper.status
+    )
+
+
+@router.get("/papers/recommendations/search", response_model=PaperRecommendationsResponse)
+@limiter.limit("20/minute")
+async def search_paper_recommendations_endpoint(
+    request: Request,
+    title: str,
+    limit: int = 5,
+    current_user: User = Depends(get_current_user)
+) -> PaperRecommendationsResponse:
+    """
+    Search for related reference papers given a paper title string via Semantic Scholar.
+    """
+    if not title or not title.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Title parameter cannot be empty.")
+
+    service = SemanticScholarService()
+    raw_recommendations = await service.fetch_related_papers_by_title(title.strip(), limit=limit)
+
+    recommendations = [RecommendedPaper(**p) for p in raw_recommendations]
+    return PaperRecommendationsResponse(
+        seed_title=title.strip(),
+        count=len(recommendations),
+        recommendations=recommendations
     )
 
 
@@ -502,4 +534,29 @@ async def get_paper_chat_history_endpoint(
         )
 
     return chat_history
+
+
+@router.get("/papers/{paper_id}/recommendations", response_model=PaperRecommendationsResponse)
+@limiter.limit("30/minute")
+async def get_paper_recommendations_endpoint(
+    request: Request,
+    limit: int = 5,
+    paper: Paper = Depends(get_workspace_scoped_paper),
+    current_user: User = Depends(get_current_user)
+) -> PaperRecommendationsResponse:
+    """
+    Fetch recommended related academic papers for an existing paper in the workspace via Semantic Scholar.
+    """
+    service = SemanticScholarService()
+    seed_title = paper.title or paper.file_name
+    raw_recommendations = await service.fetch_related_papers_by_title(seed_title, limit=limit)
+
+    recommendations = [RecommendedPaper(**p) for p in raw_recommendations]
+    return PaperRecommendationsResponse(
+        seed_paper_id=paper.id,
+        seed_title=seed_title,
+        count=len(recommendations),
+        recommendations=recommendations
+    )
+
 

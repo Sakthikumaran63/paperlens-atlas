@@ -218,7 +218,8 @@ class AnswerGenerationService:
                 question_id=db_question.id,
                 chunk_id=cand.chunk_id,
                 rank=idx + 1,
-                similarity_score=cand.similarity_score
+                semantic_score=cand.similarity_score,
+                final_score=cand.similarity_score
             )
             db.add(ret_ev)
             await db.flush()  # flush to get ret_ev.id
@@ -238,14 +239,14 @@ class AnswerGenerationService:
 
         # 15. Persist answer-evidence relationship DB records
         for b_item in bound_evidence_items:
-            ret_ev_id = chunk_to_ret_ev.get(str(b_item.chunk_id))
-            if ret_ev_id:
-                ans_ev = AnswerEvidence(
-                    answer_id=db_answer.id,
-                    retrieved_evidence_id=ret_ev_id,
-                    quote_text=b_item.text[:500] if b_item.text else None
-                )
-                db.add(ans_ev)
+            ans_ev = AnswerEvidence(
+                answer_id=db_answer.id,
+                chunk_id=b_item.chunk_id,
+                quote_text=b_item.text[:500] if b_item.text else None,
+                page_number=b_item.page,
+                section_title=b_item.section
+            )
+            db.add(ans_ev)
 
         await db.commit()
 

@@ -162,15 +162,26 @@ class SummaryService:
             })
             claim_counter += 1
 
-        # 5. Persist PaperAnalysis in PostgreSQL
-        analysis = PaperAnalysis(
-            paper_id=paper_id,
-            summary_json=structured_summary.model_dump(),
-            methodology_json={"summary": structured_summary.methodology_summary},
-            contributions_json=structured_summary.key_contributions,
-            claims_json=claims_list
-        )
-        db.add(analysis)
+        # 5. Persist or update PaperAnalysis
+        existing_stmt = select(PaperAnalysis).where(PaperAnalysis.paper_id == paper_id)
+        existing_res = await db.execute(existing_stmt)
+        analysis = existing_res.scalar_one_or_none()
+
+        if analysis:
+            analysis.summary_json = structured_summary.model_dump()
+            analysis.methodology_json = {"summary": structured_summary.methodology_summary}
+            analysis.contributions_json = structured_summary.key_contributions
+            analysis.claims_json = claims_list
+        else:
+            analysis = PaperAnalysis(
+                paper_id=paper_id,
+                summary_json=structured_summary.model_dump(),
+                methodology_json={"summary": structured_summary.methodology_summary},
+                contributions_json=structured_summary.key_contributions,
+                claims_json=claims_list
+            )
+            db.add(analysis)
+
         await db.commit()
         await db.refresh(analysis)
         return analysis

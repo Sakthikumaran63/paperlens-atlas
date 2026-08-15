@@ -311,34 +311,38 @@ def _sentences_with_keywords(text: str, keywords: tuple[str, ...], max_sentences
 # 3. Offline extractive Q&A
 # --------------------------------------------------------------------------
 
+class _OfflineAnswerResult(dict):
+    def __getattr__(self, name: str) -> Any:
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
+
 def generate_offline_answer(
     question_text: str,
-    evidence_items: Sequence[Mapping[str, Any]],
+    evidence_items: Optional[Sequence[Mapping[str, Any]]] = None,
+    evidence_package: Optional[Any] = None,
     max_sentences: int = 8,
-) -> dict[str, Any]:
-    """Produce a best-effort extractive answer from evidence chunks.
+    **kwargs,
+) -> _OfflineAnswerResult:
+    """Produce a best-effort extractive answer from evidence chunks or evidence package."""
+    items: list[dict[str, Any]] = []
+    if evidence_items:
+        items = list(evidence_items)
+    elif evidence_package and hasattr(evidence_package, "items"):
+        for item in evidence_package.items:
+            items.append({
+                "text": getattr(item, "text", ""),
+                "evidence_id": getattr(item, "evidence_id", getattr(item, "chunk_id", ""))
+            })
 
-    This is NOT a substitute for a real LLM — it exists so that Q&A works
-    end-to-end locally when no LLM API key is configured.
-
-    Strategy:
-    1. Tokenize the question into keywords (minus stopwords).
-    2. Score each sentence in the evidence by how many question keywords it
-       contains.
-    3. Select the top-scoring sentences (deduped, ordered by original
-       position) as the answer.
-    4. Return the evidence IDs used so the pipeline can build citation links.
-
-    Returns a dict matching `LLMAnswerOutput` shape:
-        {"answer": str, "evidence_ids": list[str], "confidence": float, "abstain": bool}
-    """
-    if not evidence_items:
-        return {
+    if not items:
+        return _OfflineAnswerResult({
             "answer": "I couldn't find enough information in the uploaded paper to answer this reliably.",
             "evidence_ids": [],
             "confidence": 0.0,
             "abstain": True,
-        }
+        })
 
     # Build question keywords
     q_tokens = [t for t in _tokenize(question_text) if t not in _STOPWORDS and len(t) > 2]
@@ -347,7 +351,7 @@ def generate_offline_answer(
 
     # Score every sentence across all evidence items
     scored: list[tuple[float, str, str]] = []  # (score, sentence, evidence_id)
-    for item in evidence_items:
+    for item in items:
         text = item.get("text", "")
         eid = item.get("evidence_id", "")
         for sentence in _split_sentences(text):
@@ -377,7 +381,7 @@ def generate_offline_answer(
 
     if not selected:
         # If no keyword matches, take first sentences from top evidence items
-        for item in evidence_items[:3]:
+        for item in items[:3]:
             text = item.get("text", "")
             eid = item.get("evidence_id", "")
             for sent in _split_sentences(text)[:2]:
@@ -386,12 +390,12 @@ def generate_offline_answer(
                 break
 
     if not selected:
-        return {
+        return _OfflineAnswerResult({
             "answer": "I couldn't find enough information in the uploaded paper to answer this reliably.",
             "evidence_ids": [],
             "confidence": 0.0,
             "abstain": True,
-        }
+        })
 
     # Build answer text
     answer_parts = [s for s, _ in selected]
@@ -408,10 +412,10 @@ def generate_offline_answer(
     else:
         confidence = 0.4
 
-    return {
+    return _OfflineAnswerResult({
         "answer": answer_text,
         "evidence_ids": used_eids,
         "confidence": round(confidence, 3),
         "abstain": False,
-    }
+    })
 

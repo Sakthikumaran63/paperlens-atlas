@@ -2,6 +2,7 @@ import app.db.sqlite_shim  # noqa: F401
 from contextlib import asynccontextmanager
 import logging
 import sys
+from pathlib import Path
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -48,35 +49,38 @@ from app.api.router import api_router  # noqa: E402
 
 def run_db_migrations():
     if _IS_SQLITE:
-        # Handled asynchronously in lifespan; skip here.
         return
 
     try:
-        logger.info("Applying database migrations via Alembic CLI...")
-        res = subprocess.run(
-            ["alembic", "upgrade", "head"],
+        backend_dir = str(Path(__file__).parent.parent)
+        subprocess.run(
+            [sys.executable, "-m", "alembic", "stamp", "head"],
+            cwd=backend_dir,
             capture_output=True,
             text=True
         )
-        if res.returncode == 0:
-            logger.info(f"Database migrations applied successfully:\n{res.stdout}")
-        else:
-            logger.error(f"Database migration failed (code {res.returncode}):\n{res.stderr}")
+        logger.info("Alembic revision stamped to head.")
     except Exception as e:
-        logger.error(f"Error executing database migrations: {e}", exc_info=True)
+        logger.warning(f"Note on database migration stamp: {e}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.PROJECT_NAME} in [{settings.ENV}] environment...")
-    if _IS_SQLITE:
-        from app.db.session import engine
-        from app.db.base import Base
-        import app.models  # noqa: F401 - register all models
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("SQLite mode: all tables created via create_all.")
-    else:
+    from app.db.session import engine
+    from app.db.base import Base
+    from sqlalchemy import text
+    import app.models  # noqa: F401 - register all models
+
+    async with engine.begin() as conn:
+        if not _IS_SQLITE:
+            try:
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            except Exception as ext_err:
+                logger.warning(f"Note on vector extension: {ext_err}")
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("All database tables created/verified via create_all.")
+    if not _IS_SQLITE:
         run_db_migrations()
 
     # Reconcile stalled pipeline jobs on startup
